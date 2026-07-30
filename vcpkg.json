@@ -1,0 +1,21 @@
+{
+  "name": "nativeshift",
+  "version-semver": "0.1.0",
+  "description": "Native Windows file conversion engine and CLI",
+  "builtin-baseline": "c1d80d9cb071c3f4a98c67c1196b137cc5b72918",
+  "supports": "windows & x64",
+  "dependencies": [
+    "gtest",
+    "libjpeg-turbo",
+    "libpng",
+    {
+      "name": "libwebp",
+      "default-features": false,
+      "features": [
+        "simd",
+        "unicode"
+      ]
+    },
+    "nlohmann-json"
+  ]
+}
