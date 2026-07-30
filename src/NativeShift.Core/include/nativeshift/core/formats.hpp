@@ -20,6 +20,7 @@ enum class FileFormat {
     Aac,
     M4a,
     Ogg,
+    Opus,
     Mp4,
     Mkv,
     WebM,
@@ -35,5 +36,7 @@ FormatFromString(std::string_view value);
 [[nodiscard]] std::string_view ExtensionFor(FileFormat format) noexcept;
 [[nodiscard]] MediaKind KindOf(FileFormat format) noexcept;
 [[nodiscard]] bool IsImageFormat(FileFormat format) noexcept;
+[[nodiscard]] bool IsAudioFormat(FileFormat format) noexcept;
+[[nodiscard]] bool IsVideoFormat(FileFormat format) noexcept;
 
 } // namespace nativeshift::core

@@ -27,6 +27,7 @@ class JobHandle {
     WaitFor(std::chrono::milliseconds timeout) const;
     [[nodiscard]] ConversionResult Get() const;
     [[nodiscard]] std::uint64_t Id() const noexcept;
+    [[nodiscard]] Job Snapshot() const;
 
   private:
     struct State;
@@ -49,6 +50,10 @@ class JobQueue {
 
     [[nodiscard]] std::optional<JobHandle>
     TrySubmit(ConversionRequest request, ProgressCallback progress = {});
+    [[nodiscard]] std::optional<JobHandle>
+    Requeue(const JobHandle& completed,
+            std::optional<ConversionRequest> replacement = std::nullopt,
+            ProgressCallback progress = {});
 
     void Pause();
     void Resume();
@@ -56,7 +61,9 @@ class JobQueue {
 
     [[nodiscard]] bool IsPaused() const;
     [[nodiscard]] std::size_t PendingCount() const;
+    [[nodiscard]] std::size_t ActiveCount() const;
     [[nodiscard]] std::size_t MaximumConcurrency() const noexcept;
+    [[nodiscard]] std::size_t MaximumResourceWeight() const noexcept;
     [[nodiscard]] static std::size_t SafeDefaultConcurrency() noexcept;
 
   private:
@@ -64,18 +71,23 @@ class JobQueue {
         std::shared_ptr<JobHandle::State> state;
         ConversionRequest request;
         ProgressCallback progress;
+        std::size_t resource_weight{1};
     };
 
     void WorkerLoop();
-    void RemoveActive(std::uint64_t id);
+    void RemoveActive(std::uint64_t id, std::size_t resource_weight);
+    [[nodiscard]] static std::size_t
+    ResourceWeight(const ConversionRequest& request) noexcept;
 
     ConversionEngine& engine_;
     const std::size_t maximum_pending_jobs_;
+    const std::size_t maximum_resource_weight_;
     std::vector<std::jthread> workers_;
     mutable std::mutex mutex_;
     std::condition_variable condition_;
     std::deque<Task> pending_;
     std::vector<std::shared_ptr<JobHandle::State>> active_;
+    std::size_t active_resource_weight_{0};
     bool paused_{false};
     bool stopping_{false};
     std::atomic<std::uint64_t> next_id_{1};

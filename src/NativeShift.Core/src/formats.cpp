@@ -43,6 +43,8 @@ std::string_view ToString(const FileFormat format) noexcept {
         return "m4a";
     case FileFormat::Ogg:
         return "ogg";
+    case FileFormat::Opus:
+        return "opus";
     case FileFormat::Mp4:
         return "mp4";
     case FileFormat::Mkv:
@@ -68,9 +70,10 @@ std::optional<FileFormat> FormatFromString(const std::string_view value) {
         {"tiff", FileFormat::Tiff}, {"mp3", FileFormat::Mp3},
         {"wav", FileFormat::Wav},   {"flac", FileFormat::Flac},
         {"aac", FileFormat::Aac},   {"m4a", FileFormat::M4a},
-        {"ogg", FileFormat::Ogg},   {"mp4", FileFormat::Mp4},
-        {"mkv", FileFormat::Mkv},   {"webm", FileFormat::WebM},
-        {"mov", FileFormat::Mov},   {"avi", FileFormat::Avi},
+        {"ogg", FileFormat::Ogg},   {"opus", FileFormat::Opus},
+        {"mp4", FileFormat::Mp4},   {"mkv", FileFormat::Mkv},
+        {"webm", FileFormat::WebM}, {"mov", FileFormat::Mov},
+        {"avi", FileFormat::Avi},
     };
     const auto found = formats.find(normalized);
     if (found == formats.end()) {
@@ -107,6 +110,8 @@ std::string_view ExtensionFor(const FileFormat format) noexcept {
         return ".m4a";
     case FileFormat::Ogg:
         return ".ogg";
+    case FileFormat::Opus:
+        return ".opus";
     case FileFormat::Mp4:
         return ".mp4";
     case FileFormat::Mkv:
@@ -139,6 +144,7 @@ MediaKind KindOf(const FileFormat format) noexcept {
     case FileFormat::Aac:
     case FileFormat::M4a:
     case FileFormat::Ogg:
+    case FileFormat::Opus:
         return MediaKind::Audio;
     case FileFormat::Mp4:
     case FileFormat::Mkv:
@@ -154,6 +160,14 @@ MediaKind KindOf(const FileFormat format) noexcept {
 
 bool IsImageFormat(const FileFormat format) noexcept {
     return KindOf(format) == MediaKind::Image;
+}
+
+bool IsAudioFormat(const FileFormat format) noexcept {
+    return KindOf(format) == MediaKind::Audio;
+}
+
+bool IsVideoFormat(const FileFormat format) noexcept {
+    return KindOf(format) == MediaKind::Video;
 }
 
 ProviderOutcome ProviderOutcome::Succeeded() {

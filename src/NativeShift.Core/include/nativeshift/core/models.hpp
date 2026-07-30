@@ -47,6 +47,21 @@ enum class ConversionOptionKind { Boolean, Integer, Text, Choice };
 
 enum class ImageResizeMode { Fit, Fill, Stretch };
 
+enum class AudioCodec { Automatic, Mp3, PcmS16, Flac, Aac, Vorbis, Opus, Copy };
+
+enum class VideoCodec { Automatic, H264, H265, Vp9, Av1, Copy };
+
+enum class VideoAudioCodec { Automatic, Aac, Mp3, Opus, Vorbis, Copy, None };
+
+enum class HardwareAcceleration {
+    Automatic,
+    PreferHardware,
+    SoftwareOnly,
+    Specific
+};
+
+enum class SubtitleHandling { CopyCompatible, Drop };
+
 struct RgbaColor {
     std::uint8_t red{255};
     std::uint8_t green{255};
@@ -77,13 +92,50 @@ struct ImageOptions {
     RgbaColor background;
 };
 
+struct AudioOptions {
+    AudioCodec codec{AudioCodec::Automatic};
+    int bitrate_kbps{192};
+    bool variable_bitrate{false};
+    std::optional<int> sample_rate;
+    std::optional<int> channels;
+    std::string sample_format;
+    bool preserve_source_settings{true};
+    bool preserve_metadata{false};
+    std::optional<int> stream_index;
+};
+
+struct VideoOptions {
+    VideoCodec video_codec{VideoCodec::Automatic};
+    VideoAudioCodec audio_codec{VideoAudioCodec::Automatic};
+    std::optional<int> quality;
+    std::optional<int> video_bitrate_kbps;
+    std::optional<std::uint32_t> width;
+    std::optional<std::uint32_t> height;
+    bool preserve_aspect_ratio{true};
+    std::optional<double> frame_rate;
+    int audio_bitrate_kbps{192};
+    std::optional<int> audio_sample_rate;
+    std::optional<int> audio_channels;
+    std::string encoder_preset{"medium"};
+    HardwareAcceleration hardware_acceleration{HardwareAcceleration::Automatic};
+    std::string specific_encoder;
+    SubtitleHandling subtitles{SubtitleHandling::CopyCompatible};
+    bool preserve_metadata{false};
+    bool stream_copy{false};
+    std::optional<int> video_stream_index;
+    std::optional<int> audio_stream_index;
+};
+
 struct ConversionRequest {
+    std::uint64_t job_id{};
     std::filesystem::path input_path;
     std::filesystem::path output_path;
     FileFormat input_format{FileFormat::Unknown};
     FileFormat output_format{FileFormat::Unknown};
     OutputConflictPolicy conflict_policy{OutputConflictPolicy::Ask};
     ImageOptions image;
+    AudioOptions audio;
+    VideoOptions video;
 };
 
 struct ConversionProgress {
@@ -110,6 +162,8 @@ struct ProviderOutcome {
     bool cancelled{false};
     ErrorCategory error{ErrorCategory::None};
     std::string message;
+    std::string selected_codec;
+    std::string hardware_acceleration{"none"};
     std::vector<std::string> warnings;
 
     [[nodiscard]] static ProviderOutcome Succeeded();
@@ -119,10 +173,13 @@ struct ProviderOutcome {
 };
 
 struct ConversionResult {
+    std::uint64_t job_id{};
     ConversionStatus status{ConversionStatus::Failed};
     ErrorCategory error{ErrorCategory::Internal};
     std::string message;
     std::string provider;
+    std::string selected_codec;
+    std::string hardware_acceleration{"none"};
     FileFormat input_format{FileFormat::Unknown};
     FileFormat output_format{FileFormat::Unknown};
     std::filesystem::path output_path;

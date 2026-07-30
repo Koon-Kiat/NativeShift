@@ -1,5 +1,7 @@
 #include "nativeshift/core/validation.hpp"
 
+#include "nativeshift/core/output_paths.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cwctype>
@@ -70,6 +72,11 @@ ValidateRequestBasics(const ConversionRequest& request) {
         AddIssue(issues, ErrorCategory::InvalidRequest, "output_required",
                  "An output path is required.");
     } else {
+        if (!IsSafeOutputFilename(request.output_path.filename())) {
+            AddIssue(issues, ErrorCategory::InvalidRequest,
+                     "unsafe_output_filename",
+                     "The output filename is invalid or reserved.");
+        }
         auto parent = request.output_path.parent_path();
         if (parent.empty()) {
             parent = std::filesystem::current_path();

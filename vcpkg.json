@@ -5,6 +5,25 @@
   "builtin-baseline": "c1d80d9cb071c3f4a98c67c1196b137cc5b72918",
   "supports": "windows & x64",
   "dependencies": [
+    {
+      "name": "ffmpeg",
+      "default-features": false,
+      "features": [
+        "amf",
+        "aom",
+        "avcodec",
+        "avformat",
+        "mp3lame",
+        "nvcodec",
+        "openh264",
+        "opus",
+        "qsv",
+        "swresample",
+        "swscale",
+        "vorbis",
+        "vpx"
+      ]
+    },
     "gtest",
     "libjpeg-turbo",
     "libpng",

@@ -1,8 +1,10 @@
 #include "nativeshift/core/output_paths.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cwctype>
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
@@ -19,14 +21,93 @@ namespace {
 std::atomic<std::uint64_t> temporary_counter{1};
 
 std::filesystem::path SafeFilenameStem(const std::filesystem::path& input) {
-    auto stem = input.filename().stem();
-    if (stem.empty() || stem == "." || stem == "..") {
-        stem = "converted";
-    }
-    return stem;
+    return SanitizeFilenameStem(input.filename().stem());
 }
 
+#ifdef _WIN32
+bool IsReservedWindowsName(std::wstring value) {
+    const auto dot = value.find(L'.');
+    if (dot != std::wstring::npos) {
+        value.resize(dot);
+    }
+    std::ranges::transform(value, value.begin(), [](const wchar_t character) {
+        return static_cast<wchar_t>(std::towupper(character));
+    });
+    constexpr std::array reserved{
+        std::wstring_view{L"CON"},  std::wstring_view{L"PRN"},
+        std::wstring_view{L"AUX"},  std::wstring_view{L"NUL"},
+        std::wstring_view{L"COM1"}, std::wstring_view{L"COM2"},
+        std::wstring_view{L"COM3"}, std::wstring_view{L"COM4"},
+        std::wstring_view{L"COM5"}, std::wstring_view{L"COM6"},
+        std::wstring_view{L"COM7"}, std::wstring_view{L"COM8"},
+        std::wstring_view{L"COM9"}, std::wstring_view{L"LPT1"},
+        std::wstring_view{L"LPT2"}, std::wstring_view{L"LPT3"},
+        std::wstring_view{L"LPT4"}, std::wstring_view{L"LPT5"},
+        std::wstring_view{L"LPT6"}, std::wstring_view{L"LPT7"},
+        std::wstring_view{L"LPT8"}, std::wstring_view{L"LPT9"},
+    };
+    return std::ranges::find(reserved, value) != reserved.end();
+}
+#endif
+
 } // namespace
+
+std::filesystem::path
+SanitizeFilenameStem(const std::filesystem::path& source) {
+    auto value = source.native();
+#ifdef _WIN32
+    constexpr std::wstring_view invalid = L"<>:\"/\\|?*";
+    for (auto& character : value) {
+        if (character < 32 ||
+            invalid.find(character) != std::wstring_view::npos) {
+            character = L'_';
+        }
+    }
+    while (!value.empty() && (value.back() == L' ' || value.back() == L'.')) {
+        value.pop_back();
+    }
+    constexpr std::size_t maximum_stem_length = 180;
+    if (value.size() > maximum_stem_length) {
+        value.resize(maximum_stem_length);
+        while (!value.empty() &&
+               (value.back() == L' ' || value.back() == L'.')) {
+            value.pop_back();
+        }
+    }
+    if (IsReservedWindowsName(value)) {
+        value.insert(value.begin(), L'_');
+    }
+#endif
+    if (value.empty() || source == "." || source == "..") {
+        value = std::filesystem::path("converted").native();
+    }
+    return std::filesystem::path(value);
+}
+
+bool IsSafeOutputFilename(const std::filesystem::path& filename) noexcept {
+    try {
+        if (filename.empty() || filename.has_parent_path() || filename == "." ||
+            filename == "..") {
+            return false;
+        }
+#ifdef _WIN32
+        const auto value = filename.native();
+        constexpr std::wstring_view invalid = L"<>:\"/\\|?*";
+        if (value.empty() || value.back() == L' ' || value.back() == L'.' ||
+            IsReservedWindowsName(value)) {
+            return false;
+        }
+        return std::ranges::none_of(value, [invalid](const wchar_t character) {
+            return character < 32 ||
+                   invalid.find(character) != std::wstring_view::npos;
+        });
+#else
+        return filename.native().find('/') == std::string::npos;
+#endif
+    } catch (...) {
+        return false;
+    }
+}
 
 std::filesystem::path
 BuildOutputPath(const std::filesystem::path& input,

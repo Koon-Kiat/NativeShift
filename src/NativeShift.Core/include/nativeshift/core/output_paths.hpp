@@ -18,6 +18,10 @@ BuildOutputPath(const std::filesystem::path& input,
                 const std::filesystem::path& output_directory,
                 FileFormat output_format);
 [[nodiscard]] std::filesystem::path
+SanitizeFilenameStem(const std::filesystem::path& stem);
+[[nodiscard]] bool
+IsSafeOutputFilename(const std::filesystem::path& filename) noexcept;
+[[nodiscard]] std::filesystem::path
 GenerateUniqueOutputPath(const std::filesystem::path& desired);
 [[nodiscard]] OutputResolution
 ResolveOutputConflict(const std::filesystem::path& desired,

@@ -1,7 +1,9 @@
 #include "nativeshift/core/conversion_engine.hpp"
 #include "nativeshift/core/format_detector.hpp"
 #include "nativeshift/core/job_queue.hpp"
+#include "nativeshift/core/logger.hpp"
 #include "nativeshift/core/output_paths.hpp"
+#include "nativeshift/core/presets.hpp"
 #include "nativeshift/core/settings.hpp"
 #include "nativeshift/core/validation.hpp"
 
@@ -185,6 +187,26 @@ TEST(FormatDetection, RejectsUnknownContent) {
               FileFormat::Unknown);
 }
 
+TEST(FormatDetection, DetectsAudioAndVideoContainersByContent) {
+    TemporaryDirectory directory;
+    const auto aac = directory.Path() / "audio.bin";
+    const auto opus = directory.Path() / "voice.bin";
+    const auto m4a = directory.Path() / "track.bin";
+    const auto webm = directory.Path() / "movie.bin";
+    WriteBytes(aac, {0xFF, 0xF1, 0x50, 0x80});
+    WriteBytes(opus, {'O', 'g', 'g', 'S', 0,   0,   0,   0,   0,   0,  0, 0, 0,
+                      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  0, 0, 0,
+                      1,   19,  'O', 'p', 'u', 's', 'H', 'e', 'a', 'd'});
+    WriteBytes(m4a, {0, 0, 0, 24, 'f', 't', 'y', 'p', 'M', '4', 'A', ' '});
+    WriteBytes(webm,
+               {0x1A, 0x45, 0xDF, 0xA3, 0x42, 0x82, 0x84, 'w', 'e', 'b', 'm'});
+
+    EXPECT_EQ(nativeshift::core::DetectFormat(aac).format, FileFormat::Aac);
+    EXPECT_EQ(nativeshift::core::DetectFormat(opus).format, FileFormat::Opus);
+    EXPECT_EQ(nativeshift::core::DetectFormat(m4a).format, FileFormat::M4a);
+    EXPECT_EQ(nativeshift::core::DetectFormat(webm).format, FileFormat::WebM);
+}
+
 TEST(Validation, RejectsSameInputAndOutputAndBadQuality) {
     TemporaryDirectory directory;
     const auto input = directory.Path() / "source.png";
@@ -228,6 +250,17 @@ TEST(OutputPaths, AppliesConflictPolicies) {
     EXPECT_EQ(unique.path.parent_path(), desired.parent_path());
 }
 
+TEST(OutputPaths, SanitizesReservedAndInvalidWindowsNames) {
+#ifdef _WIN32
+    EXPECT_EQ(nativeshift::core::SanitizeFilenameStem(L"CON"), L"_CON");
+    EXPECT_EQ(nativeshift::core::SanitizeFilenameStem(L"bad:name. "),
+              L"bad_name");
+    EXPECT_FALSE(nativeshift::core::IsSafeOutputFilename(L"NUL.jpg"));
+    EXPECT_FALSE(nativeshift::core::IsSafeOutputFilename(L"bad:name.jpg"));
+#endif
+    EXPECT_TRUE(nativeshift::core::IsSafeOutputFilename(L"result.jpg"));
+}
+
 TEST(Settings, RecoversFromCorruptSettings) {
     TemporaryDirectory directory;
     const auto path = directory.Path() / "settings.json";
@@ -258,6 +291,9 @@ TEST(Settings, MigratesLegacyVersionAndRoundTripsUnicode) {
     EXPECT_FALSE(round_trip.recovered_from_error);
     EXPECT_EQ(round_trip.settings.default_output_folder,
               loaded.settings.default_output_folder);
+    auto backup = path;
+    backup += L".v0.bak";
+    EXPECT_TRUE(std::filesystem::exists(backup));
 }
 
 TEST(Settings, MigratesLegacyApplicationIdentityOnce) {
@@ -285,6 +321,136 @@ TEST(Settings, MigratesLegacyApplicationIdentityOnce) {
 
     const auto second_load = store.Load();
     EXPECT_FALSE(second_load.migrated);
+}
+
+TEST(Settings, SavesVersionTwoPreferencesAndIgnoresUnknownFields) {
+    TemporaryDirectory directory;
+    const auto path = directory.Path() / "settings.json";
+    nativeshift::core::SettingsStore store(path);
+    auto settings = nativeshift::core::SettingsStore::DefaultSettings();
+    settings.last_input_directory = directory.Path() / L"å…¥åŠ›";
+    settings.last_output_directory = directory.Path() / L"å‡ºåŠ›";
+    settings.preferred_audio_format = FileFormat::Opus;
+    settings.preferred_video_format = FileFormat::WebM;
+    settings.logging_level = nativeshift::core::LogLevel::Warning;
+    settings.notifications_enabled = false;
+    settings.recent_presets = {"Opus voice", "WebM VP9"};
+    std::string error;
+    ASSERT_TRUE(store.Save(settings, error)) << error;
+
+    auto text = std::ifstream(path);
+    std::string contents((std::istreambuf_iterator<char>(text)),
+                         std::istreambuf_iterator<char>());
+    const auto last_brace = contents.rfind('}');
+    ASSERT_NE(last_brace, std::string::npos);
+    contents.insert(last_brace, R"(,"future_field":{"ignored":true})");
+    std::ofstream(path, std::ios::trunc) << contents;
+
+    const auto loaded = store.Load();
+    EXPECT_FALSE(loaded.recovered_from_error);
+    EXPECT_EQ(loaded.settings.preferred_audio_format, FileFormat::Opus);
+    EXPECT_EQ(loaded.settings.preferred_video_format, FileFormat::WebM);
+    EXPECT_EQ(loaded.settings.logging_level,
+              nativeshift::core::LogLevel::Warning);
+    EXPECT_FALSE(loaded.settings.notifications_enabled);
+    EXPECT_EQ(loaded.settings.recent_presets.size(), 2U);
+}
+
+TEST(Settings, RejectsFutureSchemaAndCanReset) {
+    TemporaryDirectory directory;
+    const auto path = directory.Path() / "settings.json";
+    std::ofstream(path) << R"({"version":999,"theme":"dark"})";
+    nativeshift::core::SettingsStore store(path);
+
+    const auto rejected = store.Load();
+    EXPECT_TRUE(rejected.recovered_from_error);
+    EXPECT_EQ(rejected.settings.theme,
+              nativeshift::core::ThemePreference::System);
+
+    std::string error;
+    ASSERT_TRUE(store.Reset(error)) << error;
+    const auto reset = store.Load();
+    EXPECT_FALSE(reset.recovered_from_error);
+    EXPECT_EQ(reset.settings.version,
+              nativeshift::core::UserSettings::kCurrentVersion);
+}
+
+TEST(Presets, ProvidesReadOnlyBuiltInsForEveryMediaCategory) {
+    const auto presets = nativeshift::core::PresetStore::BuiltIns();
+    EXPECT_GE(presets.size(), 18U);
+    EXPECT_TRUE(std::ranges::all_of(
+        presets, [](const auto& preset) { return preset.built_in; }));
+    EXPECT_TRUE(std::ranges::any_of(presets, [](const auto& preset) {
+        return preset.media_kind == nativeshift::core::MediaKind::Image;
+    }));
+    EXPECT_TRUE(std::ranges::any_of(presets, [](const auto& preset) {
+        return preset.media_kind == nativeshift::core::MediaKind::Audio;
+    }));
+    EXPECT_TRUE(std::ranges::any_of(presets, [](const auto& preset) {
+        return preset.media_kind == nativeshift::core::MediaKind::Video;
+    }));
+}
+
+TEST(Presets, DuplicatesRenamesDeletesAndPersistsCustomPresets) {
+    TemporaryDirectory directory;
+    const auto built_in = nativeshift::core::PresetStore::BuiltIns().front();
+    auto custom =
+        nativeshift::core::PresetStore::Duplicate(built_in, "My JPEG");
+    ASSERT_TRUE(custom.has_value());
+    EXPECT_FALSE(custom->built_in);
+    ASSERT_TRUE(
+        nativeshift::core::PresetStore::Rename(*custom, "My JPEG Updated"));
+
+    const auto path = directory.Path() / "presets.json";
+    nativeshift::core::PresetStore store(path);
+    std::vector<nativeshift::core::ConversionPreset> presets{*custom};
+    std::string error;
+    ASSERT_TRUE(store.SaveCustom(presets, error)) << error;
+    const auto loaded = store.LoadCustom();
+    ASSERT_FALSE(loaded.recovered_from_error);
+    ASSERT_EQ(loaded.presets.size(), 1U);
+    EXPECT_EQ(loaded.presets.front().name, "My JPEG Updated");
+    EXPECT_TRUE(nativeshift::core::PresetStore::Delete(presets, custom->id));
+    EXPECT_TRUE(presets.empty());
+    EXPECT_FALSE(
+        nativeshift::core::PresetStore::Delete(presets, "does-not-exist"));
+}
+
+TEST(Presets, RejectsIncompatibleInputsAndFutureSchemas) {
+    TemporaryDirectory directory;
+    const auto image = nativeshift::core::PresetStore::BuiltIns().front();
+    const auto issues =
+        nativeshift::core::PresetStore::Validate(image, FileFormat::Mp3);
+    EXPECT_TRUE(std::ranges::any_of(issues, [](const auto& issue) {
+        return issue.code == "preset_input";
+    }));
+
+    const auto path = directory.Path() / "presets.json";
+    std::ofstream(path) << R"({"version":999,"presets":[]})";
+    const auto loaded = nativeshift::core::PresetStore(path).LoadCustom();
+    EXPECT_TRUE(loaded.recovered_from_error);
+    EXPECT_TRUE(loaded.presets.empty());
+}
+
+TEST(Logging, FiltersLevelsRotatesAndKeepsDiagnosticsPrivate) {
+    TemporaryDirectory directory;
+    const auto path = directory.Path() / "logs" / "converter.jsonl";
+    nativeshift::core::Logger logger(
+        path, false, nativeshift::core::LogLevel::Information, 1024, 2);
+    logger.Log(nativeshift::core::LogLevel::Debug, "hidden",
+               "this must be filtered");
+    for (int index = 0; index < 20; ++index) {
+        logger.Log(nativeshift::core::LogLevel::Information, "rotation_test",
+                   std::string(100, 'x'));
+    }
+
+    ASSERT_TRUE(std::filesystem::exists(path));
+    auto rotated = path;
+    rotated += L".1";
+    EXPECT_TRUE(std::filesystem::exists(rotated));
+    const auto diagnostic = logger.DiagnosticSummary("FFmpeg test");
+    EXPECT_NE(diagnostic.find("FFmpeg test"), std::string::npos);
+    EXPECT_EQ(diagnostic.find(directory.Path().string()), std::string::npos);
 }
 
 TEST(ConversionEngine, SelectsProviderAndCommitsTemporaryOutput) {
@@ -413,6 +579,62 @@ TEST(JobQueue, CancelsPendingWorkWhilePaused) {
     handle->Cancel();
     ASSERT_EQ(handle->WaitFor(1s), std::future_status::ready);
     EXPECT_EQ(handle->Get().status, ConversionStatus::Cancelled);
+}
+
+TEST(JobQueue, ExposesProgressAndFinalJobState) {
+    TemporaryDirectory directory;
+    const auto input = directory.Path() / "source.png";
+    const auto output = directory.Path() / "result.jpg";
+    WritePngSignature(input);
+    ConversionEngine engine;
+    engine.RegisterProvider(std::make_shared<FakeProvider>());
+    nativeshift::core::JobQueue queue(engine, 1, 2);
+
+    auto handle = queue.TrySubmit(MakeRequest(input, output));
+    ASSERT_TRUE(handle.has_value());
+    EXPECT_NE(handle->Snapshot().state, nativeshift::core::JobState::Failed);
+    EXPECT_EQ(handle->Get().status, ConversionStatus::Success);
+    const auto completed = handle->Snapshot();
+    EXPECT_EQ(completed.state, nativeshift::core::JobState::Completed);
+    ASSERT_TRUE(completed.result.has_value());
+    EXPECT_EQ(completed.progress.fraction, 1.0);
+}
+
+TEST(JobQueue, RequeuesFailedWorkWithModifiedSettings) {
+    TemporaryDirectory directory;
+    const auto input = directory.Path() / "source.png";
+    const auto output = directory.Path() / "result.jpg";
+    WritePngSignature(input);
+    auto provider = std::make_shared<FakeProvider>();
+    provider->fail = true;
+    ConversionEngine engine;
+    engine.RegisterProvider(provider);
+    nativeshift::core::JobQueue queue(engine, 1, 2);
+
+    auto failed = queue.TrySubmit(MakeRequest(input, output));
+    ASSERT_TRUE(failed.has_value());
+    EXPECT_EQ(failed->Get().status, ConversionStatus::Failed);
+
+    provider->fail = false;
+    auto replacement = MakeRequest(input, directory.Path() / "retry.jpg");
+    auto retried = queue.Requeue(*failed, replacement);
+    ASSERT_TRUE(retried.has_value());
+    EXPECT_EQ(retried->Get().status, ConversionStatus::Success);
+    EXPECT_EQ(retried->Snapshot().request.output_path, replacement.output_path);
+}
+
+TEST(JobQueue, UsesBoundedResourceWeights) {
+    TemporaryDirectory directory;
+    const auto input = directory.Path() / "source.png";
+    const auto output = directory.Path() / "result.jpg";
+    WritePngSignature(input);
+    ConversionEngine engine;
+    engine.RegisterProvider(std::make_shared<FakeProvider>());
+    nativeshift::core::JobQueue queue(engine, 1, 2);
+
+    EXPECT_EQ(queue.MaximumConcurrency(), 1U);
+    EXPECT_GE(queue.MaximumResourceWeight(), 4U);
+    EXPECT_LE(nativeshift::core::JobQueue::SafeDefaultConcurrency(), 4U);
 }
 
 TEST(ConversionEngine, HandlesExtendedWindowsLongPaths) {

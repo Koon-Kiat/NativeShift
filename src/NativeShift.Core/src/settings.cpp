@@ -57,7 +57,34 @@ ThemePreference ThemeFromString(const std::string& value) {
     return ThemePreference::System;
 }
 
-UserSettings Defaults() {
+std::string_view ToString(const LogLevel level) noexcept {
+    switch (level) {
+    case LogLevel::Debug:
+        return "debug";
+    case LogLevel::Warning:
+        return "warning";
+    case LogLevel::Error:
+        return "error";
+    case LogLevel::Information:
+    default:
+        return "information";
+    }
+}
+
+LogLevel LogLevelFromString(const std::string& value) {
+    if (value == "debug") {
+        return LogLevel::Debug;
+    }
+    if (value == "warning") {
+        return LogLevel::Warning;
+    }
+    if (value == "error") {
+        return LogLevel::Error;
+    }
+    return LogLevel::Information;
+}
+
+UserSettings MakeDefaults() {
     UserSettings settings;
     settings.maximum_concurrent_conversions =
         JobQueue::SafeDefaultConcurrency();
@@ -87,7 +114,7 @@ SettingsStore::SettingsStore(std::filesystem::path path,
 
 SettingsLoadResult SettingsStore::Load() const {
     SettingsLoadResult result;
-    result.settings = Defaults();
+    result.settings = MakeDefaults();
 
     std::error_code error;
     auto source_path = path_;
@@ -134,6 +161,10 @@ SettingsLoadResult SettingsStore::Load() const {
             return result;
         }
 
+        if (version < UserSettings::kCurrentVersion) {
+            result.migrated = true;
+        }
+
         if (version == 0) {
             result.migrated = true;
             result.settings.maximum_concurrent_conversions =
@@ -172,12 +203,64 @@ SettingsLoadResult SettingsStore::Load() const {
             }
             result.settings.theme =
                 ThemeFromString(json.value("theme", "system"));
+
+            if (json.contains("last_input_directory") &&
+                json["last_input_directory"].is_string()) {
+                result.settings.last_input_directory = PathFromUtf8(
+                    json["last_input_directory"].get<std::string>());
+            }
+            if (json.contains("last_output_directory") &&
+                json["last_output_directory"].is_string()) {
+                result.settings.last_output_directory = PathFromUtf8(
+                    json["last_output_directory"].get<std::string>());
+            }
+            if (const auto format = FormatFromString(
+                    json.value("preferred_audio_format", "mp3"));
+                format.has_value() && IsAudioFormat(*format)) {
+                result.settings.preferred_audio_format = *format;
+            }
+            if (const auto format = FormatFromString(
+                    json.value("preferred_video_format", "mp4"));
+                format.has_value() && IsVideoFormat(*format)) {
+                result.settings.preferred_video_format = *format;
+            }
+            result.settings.logging_level =
+                LogLevelFromString(json.value("logging_level", "information"));
+            result.settings.notifications_enabled =
+                json.value("notifications_enabled", true);
+            if (json.contains("recent_presets") &&
+                json["recent_presets"].is_array()) {
+                for (const auto& preset : json["recent_presets"]) {
+                    if (preset.is_string() &&
+                        result.settings.recent_presets.size() < 10) {
+                        result.settings.recent_presets.push_back(
+                            preset.get<std::string>());
+                    }
+                }
+            }
         }
 
         result.settings.maximum_concurrent_conversions =
             std::clamp<std::size_t>(
                 result.settings.maximum_concurrent_conversions, 1, 32);
         result.settings.version = UserSettings::kCurrentVersion;
+        if (result.migrated && !identity_migration && source_path == path_) {
+            auto backup_path = path_;
+            backup_path += L".v" + std::to_wstring(version) + L".bak";
+            error.clear();
+            std::filesystem::copy_file(
+                path_, backup_path,
+                std::filesystem::copy_options::overwrite_existing, error);
+            std::string migration_error;
+            if (error || !Save(result.settings, migration_error)) {
+                result.warning =
+                    error ? "Settings were loaded but the migration backup "
+                            "could not be created."
+                          : "Settings were loaded but the migrated file could "
+                            "not be saved: " +
+                                migration_error;
+            }
+        }
         if (identity_migration) {
             result.migrated = true;
             std::string migration_error;
@@ -205,7 +288,7 @@ SettingsLoadResult SettingsStore::Load() const {
         }
         return result;
     } catch (const std::exception&) {
-        result.settings = Defaults();
+        result.settings = MakeDefaults();
         result.recovered_from_error = true;
         result.warning = "Settings were corrupt; safe defaults were used.";
         return result;
@@ -224,7 +307,11 @@ bool SettingsStore::Save(const UserSettings& settings,
     const nlohmann::json json{
         {"version", UserSettings::kCurrentVersion},
         {"default_output_folder", PathToUtf8(settings.default_output_folder)},
+        {"last_input_directory", PathToUtf8(settings.last_input_directory)},
+        {"last_output_directory", PathToUtf8(settings.last_output_directory)},
         {"preferred_image_format", ToString(settings.preferred_image_format)},
+        {"preferred_audio_format", ToString(settings.preferred_audio_format)},
+        {"preferred_video_format", ToString(settings.preferred_video_format)},
         {"maximum_concurrent_conversions",
          std::clamp<std::size_t>(settings.maximum_concurrent_conversions, 1,
                                  32)},
@@ -232,6 +319,9 @@ bool SettingsStore::Save(const UserSettings& settings,
         {"preserve_metadata", settings.preserve_metadata},
         {"existing_file_policy", ToString(settings.existing_file_policy)},
         {"theme", ToString(settings.theme)},
+        {"logging_level", ToString(settings.logging_level)},
+        {"notifications_enabled", settings.notifications_enabled},
+        {"recent_presets", settings.recent_presets},
     };
 
     const auto temporary = MakeTemporaryOutputPath(path_);
@@ -257,9 +347,15 @@ bool SettingsStore::Save(const UserSettings& settings,
     return true;
 }
 
+bool SettingsStore::Reset(std::string& error) const {
+    return Save(DefaultSettings(), error);
+}
+
 const std::filesystem::path& SettingsStore::Path() const noexcept {
     return path_;
 }
+
+UserSettings SettingsStore::DefaultSettings() { return MakeDefaults(); }
 
 std::filesystem::path SettingsStore::DefaultPath() {
 #ifdef _WIN32
