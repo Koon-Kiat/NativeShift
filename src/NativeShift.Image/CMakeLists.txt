@@ -27,5 +27,12 @@ target_link_libraries(
 )
 
 if(WIN32)
-    target_link_libraries(NativeShift.Image PRIVATE kernel32)
+    target_link_libraries(
+        NativeShift.Image
+        PRIVATE
+            kernel32
+            ole32
+            oleaut32
+            windowscodecs
+    )
 endif()

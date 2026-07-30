@@ -59,9 +59,9 @@ ValidateRequestBasics(const ConversionRequest& request) {
                 std::filesystem::file_size(request.input_path, error);
             if (!error && size > kMaximumEncodedImageBytes &&
                 KindOf(request.input_format) == MediaKind::Image) {
-                AddIssue(issues, ErrorCategory::ResourceLimit,
-                         "input_too_large",
-                         "The encoded image exceeds the Phase 1 safety limit.");
+                AddIssue(
+                    issues, ErrorCategory::ResourceLimit, "input_too_large",
+                    "The encoded image exceeds the configured safety limit.");
             }
         }
     }

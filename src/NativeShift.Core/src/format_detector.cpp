@@ -52,7 +52,9 @@ FileProbeResult DetectFormat(const std::filesystem::path& input_path) {
         return {FileFormat::Bmp, {}};
     }
     if (Matches(bytes, count, 0, {'I', 'I', 0x2A, 0x00}) ||
-        Matches(bytes, count, 0, {'M', 'M', 0x00, 0x2A})) {
+        Matches(bytes, count, 0, {'M', 'M', 0x00, 0x2A}) ||
+        Matches(bytes, count, 0, {'I', 'I', 0x2B, 0x00}) ||
+        Matches(bytes, count, 0, {'M', 'M', 0x00, 0x2B})) {
         return {FileFormat::Tiff, {}};
     }
     if (Matches(bytes, count, 0, {'f', 'L', 'a', 'C'})) {

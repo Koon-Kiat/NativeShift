@@ -9,6 +9,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -99,6 +100,31 @@ std::optional<int> ParseInteger(const std::wstring_view value) {
     }
 }
 
+std::optional<nativeshift::core::RgbaColor>
+ParseColor(std::wstring_view value) {
+    if (!value.empty() && value.front() == L'#') {
+        value.remove_prefix(1);
+    }
+    if (value.size() != 6) {
+        return std::nullopt;
+    }
+    try {
+        std::size_t consumed = 0;
+        const auto color = std::stoul(std::wstring(value), &consumed, 16);
+        if (consumed != value.size()) {
+            return std::nullopt;
+        }
+        return nativeshift::core::RgbaColor{
+            static_cast<std::uint8_t>((color >> 16U) & 0xFFU),
+            static_cast<std::uint8_t>((color >> 8U) & 0xFFU),
+            static_cast<std::uint8_t>(color & 0xFFU),
+            255,
+        };
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
     CliOptions options;
     if (argc <= 1) {
@@ -130,9 +156,9 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
             }
             const auto format =
                 nativeshift::core::FormatFromString(NarrowAscii(*value));
-            if (!format || !nativeshift::core::IsPhase1ImageFormat(*format)) {
+            if (!format || !nativeshift::core::IsImageFormat(*format)) {
                 return {std::nullopt,
-                        "--to must be png, jpeg, or webp in Phase 1."};
+                        "--to must be png, jpeg, webp, bmp, or tiff."};
             }
             options.output_format = *format;
         } else if (argument == L"--output" || argument == L"-o") {
@@ -162,12 +188,51 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
                 return {std::nullopt, "--height requires a positive integer."};
             }
             options.image.height = *number;
+        } else if (argument == L"--lossless") {
+            options.image.lossless = true;
+        } else if (argument == L"--fit") {
+            options.image.resize_mode = nativeshift::core::ImageResizeMode::Fit;
+        } else if (argument == L"--fill") {
+            options.image.resize_mode =
+                nativeshift::core::ImageResizeMode::Fill;
         } else if (argument == L"--stretch") {
-            options.image.preserve_aspect_ratio = false;
+            options.image.resize_mode =
+                nativeshift::core::ImageResizeMode::Stretch;
+        } else if (argument == L"--prevent-enlargement") {
+            options.image.prevent_enlargement = true;
+        } else if (argument == L"--rotate") {
+            const auto value = require_value(L"--rotate");
+            const auto number = value ? ParseInteger(*value) : std::nullopt;
+            if (!number || (*number != 0 && *number != 90 && *number != 180 &&
+                            *number != 270)) {
+                return {std::nullopt, "--rotate must be 0, 90, 180, or 270."};
+            }
+            options.image.rotation_degrees =
+                static_cast<std::uint16_t>(*number);
+        } else if (argument == L"--no-auto-orient") {
+            options.image.automatic_orientation = false;
         } else if (argument == L"--preserve-metadata") {
             options.image.preserve_metadata = true;
         } else if (argument == L"--remove-metadata") {
             options.image.preserve_metadata = false;
+        } else if (argument == L"--preserve-color-profile") {
+            options.image.preserve_color_profile = true;
+        } else if (argument == L"--background") {
+            const auto value = require_value(L"--background");
+            const auto color = value ? ParseColor(*value) : std::nullopt;
+            if (!color) {
+                return {std::nullopt,
+                        "--background requires an RRGGBB hexadecimal colour."};
+            }
+            options.image.background = *color;
+        } else if (argument == L"--compression-level") {
+            const auto value = require_value(L"--compression-level");
+            const auto number = value ? ParseInteger(*value) : std::nullopt;
+            if (!number || *number < 0 || *number > 9) {
+                return {std::nullopt,
+                        "--compression-level must be between 0 and 9."};
+            }
+            options.image.compression_level = *number;
         } else if (argument == L"--recursive") {
             options.recursive = true;
         } else if (argument == L"--json") {
@@ -213,32 +278,41 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
 }
 
 void PrintUsage() {
-    std::cout << "NativeShift CLI " << NATIVESHIFT_VERSION << "\n\n"
-              << "Usage:\n"
-              << "  nativeshift-cli <input> --to <png|jpeg|webp> [options]\n"
-              << "  nativeshift-cli --list-formats [--json]\n\n"
-              << "Options:\n"
-              << "  -o, --output <path>       Output file or folder\n"
-              << "      --quality <1-100>     JPEG/WebP quality (default 85)\n"
-              << "      --width <pixels>      Optional output width\n"
-              << "      --height <pixels>     Optional output height\n"
-              << "      --stretch             Do not preserve aspect ratio\n"
-              << "      --preserve-metadata   Request metadata preservation\n"
-              << "      --remove-metadata     Remove metadata (default)\n"
-              << "      --conflict <policy>   ask|skip|replace|unique\n"
-              << "      --jobs <1-32>         Maximum concurrent jobs\n"
-              << "      --recursive           Recurse into an input folder\n"
-              << "      --json                Emit machine-readable results\n"
-              << "      --list-formats        List supported conversion pairs\n"
-              << "      --version             Show application version\n"
-              << "  -h, --help                Show this help\n";
+    std::cout
+        << "NativeShift CLI " << NATIVESHIFT_VERSION << "\n\n"
+        << "Usage:\n"
+        << "  nativeshift-cli <input> --to "
+           "<png|jpeg|webp|bmp|tiff> [options]\n"
+        << "  nativeshift-cli --list-formats [--json]\n\n"
+        << "Options:\n"
+        << "  -o, --output <path>       Output file or folder\n"
+        << "      --quality <1-100>     JPEG/WebP quality (default 85)\n"
+        << "      --lossless            Use lossless WebP encoding\n"
+        << "      --width <pixels>      Optional output width\n"
+        << "      --height <pixels>     Optional output height\n"
+        << "      --fit|--fill|--stretch Resize mode (default fit)\n"
+        << "      --prevent-enlargement Do not upscale the image\n"
+        << "      --rotate <degrees>     0, 90, 180, or 270\n"
+        << "      --no-auto-orient      Ignore EXIF orientation\n"
+        << "      --preserve-metadata   Request metadata preservation\n"
+        << "      --remove-metadata     Remove metadata (default)\n"
+        << "      --preserve-color-profile Request profile preservation\n"
+        << "      --background <RRGGBB> Alpha background (default white)\n"
+        << "      --compression-level <0-9> PNG/TIFF compression\n"
+        << "      --conflict <policy>   ask|skip|replace|unique\n"
+        << "      --jobs <1-32>         Maximum concurrent jobs\n"
+        << "      --recursive           Recurse into an input folder\n"
+        << "      --json                Emit machine-readable results\n"
+        << "      --list-formats        List supported conversion pairs\n"
+        << "      --version             Show application version\n"
+        << "  -h, --help                Show this help\n";
 }
 
 void PrintFormats(const bool json) {
     constexpr std::array formats{
-        std::string_view{"png"},
-        std::string_view{"jpeg"},
-        std::string_view{"webp"},
+        std::string_view{"png"},  std::string_view{"jpeg"},
+        std::string_view{"webp"}, std::string_view{"bmp"},
+        std::string_view{"tiff"},
     };
     if (json) {
         nlohmann::json output{
@@ -251,7 +325,7 @@ void PrintFormats(const bool json) {
         std::cout << output.dump() << '\n';
         return;
     }
-    std::cout << "Image input/output: png, jpeg, webp\n";
+    std::cout << "Image input/output: png, jpeg, webp, bmp, tiff\n";
 }
 
 std::vector<std::filesystem::path> CollectInputs(const CliOptions& options,
@@ -278,7 +352,7 @@ std::vector<std::filesystem::path> CollectInputs(const CliOptions& options,
             return;
         }
         const auto detection = nativeshift::core::DetectFormat(entry.path());
-        if (nativeshift::core::IsPhase1ImageFormat(detection.format)) {
+        if (nativeshift::core::IsImageFormat(detection.format)) {
             inputs.push_back(entry.path());
         }
     };

@@ -154,7 +154,7 @@ SettingsLoadResult SettingsStore::Load() const {
             }
             if (const auto format = FormatFromString(
                     json.value("preferred_image_format", "png"));
-                format.has_value() && IsPhase1ImageFormat(*format)) {
+                format.has_value() && IsImageFormat(*format)) {
                 result.settings.preferred_image_format = *format;
             }
             result.settings.maximum_concurrent_conversions =

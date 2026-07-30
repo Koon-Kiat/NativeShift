@@ -5,33 +5,33 @@ All file inspection and conversion happens in-process on the local computer.
 There are no uploads, accounts, advertisements, telemetry, or shell-based codec
 commands.
 
-The naming and compatibility decision is recorded in
-[docs/naming.md](docs/naming.md).
-
-This repository currently contains **Phase 1**: a C++23 conversion engine,
-bounded job queue, native image provider, command-line interface, and tests. The
-WinUI 3 application is intentionally deferred until the engine is proven.
+The repository is under active development. The shared C++23 engine, bounded
+job queue, complete still-image provider, command-line interface, and tests are
+implemented. Media and WinUI components are being added in subsequent commits.
 
 ## Current support
 
 | Input | Output | Provider |
 |---|---|---|
-| PNG | PNG, JPEG, WebP | libpng / libjpeg-turbo / libwebp |
-| JPEG | PNG, JPEG, WebP | libpng / libjpeg-turbo / libwebp |
-| WebP | PNG, JPEG, WebP | libpng / libjpeg-turbo / libwebp |
+| PNG | PNG, JPEG, WebP, BMP, TIFF | libpng / libjpeg-turbo / libwebp / WIC |
+| JPEG | PNG, JPEG, WebP, BMP, TIFF | libpng / libjpeg-turbo / libwebp / WIC |
+| WebP | PNG, JPEG, WebP, BMP, TIFF | libpng / libjpeg-turbo / libwebp / WIC |
+| BMP | PNG, JPEG, WebP, BMP, TIFF | Windows Imaging Component |
+| TIFF | PNG, JPEG, WebP, BMP, TIFF | Windows Imaging Component |
 
-Phase 1 supports JPEG/WebP quality, optional width and height, aspect-ratio
-preservation, conflict policies, cancellation, batch folders, recursive
-folders, configurable concurrency, Unicode paths, JSON output, and transactional
-temporary outputs.
+Image conversion supports JPEG/WebP quality, lossless WebP, optional width and
+height, fit/fill/stretch, enlargement prevention, EXIF orientation, rotation,
+alpha compositing, TIFF compression selection, conflict policies,
+cancellation, batch folders, recursive folders, configurable concurrency,
+Unicode paths, JSON output, and transactional temporary outputs.
 
-Metadata is removed. `--preserve-metadata` is accepted as a forward-compatible
-option, but Phase 1 emits a warning because preservation is not implemented yet.
+Metadata is removed. `--preserve-metadata` and
+`--preserve-color-profile` emit explicit warnings when the selected native
+conversion path cannot honour them.
 
 ## Not yet supported
 
 - The WinUI 3 interface
-- BMP/TIFF conversion (their signatures are detected only)
 - Audio and video conversion or FFmpeg
 - Hardware acceleration
 - Office document conversion
@@ -84,10 +84,10 @@ media files.
 ## CLI
 
 ```powershell
-.\out\build\debug\src\NativeShift.Cli\nativeshift-cli.exe input.png --to webp --output output.webp
-.\out\build\debug\src\NativeShift.Cli\nativeshift-cli.exe input.jpg --to png --width 1920
-.\out\build\debug\src\NativeShift.Cli\nativeshift-cli.exe .\input-folder --to jpeg --output .\converted --recursive --jobs 4
-.\out\build\debug\src\NativeShift.Cli\nativeshift-cli.exe input.png --to webp --json
+.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe input.png --to webp --output output.webp
+.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe input.jpg --to png --width 1920
+.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe .\input-folder --to jpeg --output .\converted --recursive --jobs 4
+.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe input.png --to webp --json
 ```
 
 Run `nativeshift-cli --help` for all options. Exit codes are `0` for success,
@@ -109,12 +109,14 @@ encoding.
 ## Codec licensing and distribution
 
 Dependency installation for development does not automatically grant a
-distributor every obligation needed for a shipped product. Phase 1 uses libpng,
-libjpeg-turbo, and libwebp; each binary distribution must include the notices
-required by the exact versions in `vcpkg_installed`.
+distributor every obligation needed for a shipped product. The image provider
+uses libpng, libjpeg-turbo, libwebp, and Windows Imaging Component; each binary
+distribution must include the notices required by the exact versions in
+`vcpkg_installed`.
 
-libvips is not in the official vcpkg catalog at the pinned baseline, so Phase 1
-uses the individual maintained codecs. A future libvips provider must account
+libvips is not in the official vcpkg catalog at the pinned baseline, so
+NativeShift uses individual maintained codecs and Windows Imaging Component. A
+future libvips provider must account
 for libvips' LGPL terms and every enabled transitive codec. FFmpeg licensing is
 configuration-dependent: enabling GPL codecs changes the resulting binary's
 license obligations, and nonfree configurations are not redistributable under

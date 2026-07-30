@@ -152,9 +152,8 @@ MediaKind KindOf(const FileFormat format) noexcept {
     }
 }
 
-bool IsPhase1ImageFormat(const FileFormat format) noexcept {
-    return format == FileFormat::Png || format == FileFormat::Jpeg ||
-           format == FileFormat::WebP;
+bool IsImageFormat(const FileFormat format) noexcept {
+    return KindOf(format) == MediaKind::Image;
 }
 
 ProviderOutcome ProviderOutcome::Succeeded() {

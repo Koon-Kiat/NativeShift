@@ -132,7 +132,6 @@ TEST(ImageIntegration, ConvertsJpegToWebPAndResizes) {
     auto request = Request(jpeg, webp, FileFormat::WebP);
     request.image.width = 4;
     request.image.height = 4;
-    request.image.preserve_aspect_ratio = true;
     const auto result = engine.Convert(request);
     ASSERT_EQ(result.status, ConversionStatus::Success) << result.message;
     EXPECT_EQ(nativeshift::core::DetectFormat(webp).format, FileFormat::WebP);
@@ -150,6 +149,63 @@ TEST(ImageIntegration, ConvertsJpegToWebPAndResizes) {
     ASSERT_NE(WebPGetInfo(bytes.data(), bytes.size(), &width, &height), 0);
     EXPECT_EQ(width, 4);
     EXPECT_EQ(height, 4);
+}
+
+TEST(ImageIntegration, ConvertsBmpAndTiffWithoutTrustingExtensions) {
+    TemporaryDirectory directory;
+    const auto png = directory.Path() / "source.png";
+    const auto bmp = directory.Path() / "bitmap.data";
+    const auto tiff = directory.Path() / "multipurpose.bin";
+    const auto result_png = directory.Path() / "round-trip.png";
+    ASSERT_TRUE(CreateTinyPng(png));
+    auto engine = MakeEngine();
+
+    const auto bmp_result = engine.Convert(Request(png, bmp, FileFormat::Bmp));
+    ASSERT_EQ(bmp_result.status, ConversionStatus::Success)
+        << bmp_result.message;
+    EXPECT_EQ(nativeshift::core::DetectFormat(bmp).format, FileFormat::Bmp);
+
+    const auto tiff_result =
+        engine.Convert(Request(bmp, tiff, FileFormat::Tiff));
+    ASSERT_EQ(tiff_result.status, ConversionStatus::Success)
+        << tiff_result.message;
+    EXPECT_EQ(nativeshift::core::DetectFormat(tiff).format, FileFormat::Tiff);
+
+    const auto round_trip =
+        engine.Convert(Request(tiff, result_png, FileFormat::Png));
+    ASSERT_EQ(round_trip.status, ConversionStatus::Success)
+        << round_trip.message;
+    EXPECT_EQ(nativeshift::core::DetectFormat(result_png).format,
+              FileFormat::Png);
+}
+
+TEST(ImageIntegration, PreventsUnrequestedEnlargement) {
+    TemporaryDirectory directory;
+    const auto input = directory.Path() / "source.png";
+    const auto output = directory.Path() / "result.webp";
+    ASSERT_TRUE(CreateTinyPng(input));
+    auto engine = MakeEngine();
+    auto request = Request(input, output, FileFormat::WebP);
+    request.image.width = 8;
+    request.image.height = 8;
+    request.image.prevent_enlargement = true;
+
+    const auto result = engine.Convert(request);
+    ASSERT_EQ(result.status, ConversionStatus::Success) << result.message;
+
+    std::ifstream stream(output, std::ios::binary | std::ios::ate);
+    ASSERT_TRUE(stream);
+    const auto size = stream.tellg();
+    ASSERT_GT(size, 0);
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+    stream.seekg(0);
+    stream.read(reinterpret_cast<char*>(bytes.data()),
+                static_cast<std::streamsize>(bytes.size()));
+    int width = 0;
+    int height = 0;
+    ASSERT_NE(WebPGetInfo(bytes.data(), bytes.size(), &width, &height), 0);
+    EXPECT_EQ(width, 2);
+    EXPECT_EQ(height, 2);
 }
 
 TEST(ImageIntegration, RemovesPartialOutputForInvalidInput) {

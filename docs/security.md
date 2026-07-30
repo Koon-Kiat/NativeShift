@@ -40,6 +40,9 @@ is observed immediately before and after that call, not from inside it. JPEG
 decode/encode and resizing check cancellation per scanline. PNG's simplified
 decode/encode API has the same between-call cancellation limitation as WebP.
 
+BMP and TIFF are decoded through Windows Imaging Component into the same
+bounded RGBA representation. Multi-page TIFF input uses only its first frame.
+
 Phase 1 does not sandbox codecs in a separate process. Before handling files
 from high-risk adversarial sources, evaluate a low-privilege broker/provider
 process with job objects, memory limits, and a narrow IPC contract.
