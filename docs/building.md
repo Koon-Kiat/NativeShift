@@ -8,6 +8,7 @@ Install Visual Studio with:
 - MSVC x64 build tools
 - A current Windows SDK
 - CMake tools for Windows
+- Windows application development and MSIX packaging tools
 
 Install or use a Visual Studio-bundled vcpkg. CMake 3.28+ and Ninja must be
 available in the x64 Developer PowerShell.
@@ -30,8 +31,24 @@ ctest --preset release
 ```
 
 The first configure downloads/builds manifest dependencies. `vcpkg.json` pins a
-registry baseline for repeatability. Do not edit installed dependency sources
+registry baseline and FFmpeg feature set for repeatability. Its first build can
+take a substantial amount of time. Do not edit installed dependency sources
 under `vcpkg_installed`.
+
+## WinUI application
+
+Build the CMake Release tree first so the native bridge and runtime
+dependencies exist, then:
+
+```powershell
+msbuild .\src\NativeShift.App\NativeShift.App.vcxproj /restore `
+  /p:Configuration=Debug /p:Platform=x64
+msbuild .\src\NativeShift.App\NativeShift.App.vcxproj /restore `
+  /p:Configuration=Release /p:Platform=x64
+```
+
+NuGet versions are pinned in the project. The MSIX development publisher is
+not a trusted production identity.
 
 ## AddressSanitizer
 

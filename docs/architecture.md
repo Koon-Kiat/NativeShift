@@ -4,87 +4,83 @@
 
 ```text
 src/
-  NativeShift.Core/   Models, detection, validation, output transaction,
-                      provider registry, settings, logging, bounded queue
-  NativeShift.Image/  PNG/JPEG/WebP codecs plus Windows BMP/TIFF support
-  NativeShift.Platform.Windows/
-                      Windows storage and application-data services
-  NativeShift.Cli/    Automation interface using the same engine and queue
+  NativeShift.Core/             Requests, validation, registry, queue, settings
+  NativeShift.Image/            PNG/JPEG/WebP and Windows BMP/TIFF
+  NativeShift.Media/            Native FFmpeg media and capabilities
+  NativeShift.Platform.Windows/ Windows storage and application data
+  NativeShift.GuiBridge/        Versioned JSON DTOs over a narrow C ABI
+  NativeShift.Cli/              Automation interface
+  NativeShift.App/              WinUI 3 views and presentation models
 tests/
   NativeShift.Core.Tests/
   NativeShift.Image.Tests/
+  NativeShift.Media.Tests/
+  NativeShift.GuiBridge.Tests/
 ```
-
-Later phases add `App`, `NativeShift.Media`, and optional document
-providers without moving codec logic into the UI.
 
 ## Dependency direction
 
 ```text
-CLI / future WinUI
-        |
-        v
-  NativeShift.Core <---- NativeShift.Image / NativeShift.Media
-        ^
-        |
- NativeShift.Platform.Windows / future Document providers
+CLI -----------+
+               v
+WinUI -> GuiBridge -> Core <- Image / Media providers
+                         ^
+                         |
+                  Windows platform services
 ```
 
-`NativeShift.Core` knows only `IConversionProvider` and the narrow
-`IPlatformServices` abstraction. It has no WinUI, codec, or file-picker
-dependency. `ProviderRegistry` owns provider discovery and capability
-enumeration. Presentation layers construct an engine, register providers,
-submit requests, and consume progress/results.
+Core knows only `IConversionProvider` and the narrow `IPlatformServices`
+interface. It has no WinUI, file-picker, or codec dependency. The GUI receives
+JSON DTOs, so generated C++/WinRT code never reaches conversion internals.
 
-Provider conversion is synchronous by design and is invoked only on a bounded
-queue worker. Returning an internally launched future from each provider would
-allow codecs to create unbounded work outside the scheduler. The queue itself is
-the asynchronous boundary exposed to the CLI and future WinUI view models.
+Provider conversion is synchronous and runs only on a bounded queue worker.
+This makes the queue the single asynchronous boundary and prevents providers
+from launching unbounded hidden work. Requests and results are values;
+providers are registered in a composition root and selected by capability.
 
 ## Conversion lifecycle
 
-1. Inspect content signatures and set the authoritative input format.
-2. Validate common request fields and safety limits.
-3. Select a provider and run provider-specific validation.
-4. Resolve the existing-file policy.
-5. Check available disk space against a conservative estimate.
-6. Create a unique temporary path beside the final output.
-7. Decode, transform, and encode on a worker thread.
-8. Commit the temporary file with a same-volume rename.
-9. Remove temporary output on failure or cancellation.
-10. Return an isolated result and write a privacy-filtered structured log event.
+1. Inspect content signatures and establish the authoritative input format.
+2. Validate common safety constraints and provider-specific options.
+3. Select a compatible provider and resolve the output conflict policy.
+4. Estimate output and check available disk space.
+5. Create an unpredictable temporary path beside the destination.
+6. Decode, transform, and encode with progress and cooperative cancellation.
+7. Commit with a same-volume rename only after successful encoding.
+8. Remove temporary output on failure or cancellation.
+9. Return an isolated result and write a privacy-filtered structured event.
 
-No single job exception is allowed to escape the engine or worker boundary.
+No job exception is allowed across the engine or worker boundary.
 
 ## Scheduling
 
-`JobQueue` has a fixed worker count (1-32), a bounded pending deque, per-job stop
-sources, pause/resume for jobs that have not started, and failure isolation.
-The safe default is half the logical hardware threads, clamped to 1–4. The CLI
-can change this using `--jobs`; future settings and UI use the same constructor.
+The queue has a fixed worker pool, bounded pending work, per-job stop sources,
+observable snapshots, pause/resume/retry, and failure isolation. Admission is
+resource weighted: images and audio cost one unit, hardware video two, and
+software video four. The default resource budget is derived conservatively
+from processor count and available memory. FIFO ordering is retained among
+jobs that fit the current budget.
 
-The media phase should add a weighted or class-aware admission controller so a
-small image and a memory-intensive video job do not count as equivalent work.
+The GUI bridge owns one process-lifetime composition root because the DLL must
+retain the queue behind its C ABI. This is the only singleton-like boundary;
+the core and providers use explicit ownership and dependency injection.
 
-## Image provider choice
+## Provider choices
 
-The requested preference was libvips where practical. At the pinned vcpkg
-baseline there is no official libvips port. Maintaining an overlay port would
-add a large GLib stack and create project-owned package maintenance before the
-engine is validated. NativeShift therefore uses official vcpkg ports for
-libpng, libjpeg-turbo, and libwebp, plus Windows Imaging Component for BMP and
-TIFF.
+The pinned vcpkg registry has no official libvips port. NativeShift uses
+maintained libpng, libjpeg-turbo, libwebp ports and Windows Imaging Component
+inside `NativeShift.Image`. `NativeShift.Media` uses FFmpeg libraries directly,
+not an executable or shell command. Both remain replaceable providers.
 
-This decision is contained inside `NativeShift.Image`. A future libvips
-provider can be registered later, ordered by capability, without changing
-requests, scheduling, CLI parsing, or transactional output behavior.
+Optional document and archive features must be separate providers. Document
+tools require direct argument-array process launch, timeout, cancellation, and
+restricted temporary storage. Archive support requires traversal,
+decompression, file-count, ratio, and unsafe-link defenses.
 
 ## Threading contract
 
-- Requests and results are value objects.
-- Provider instances must support calls from multiple queue workers.
-- Progress callbacks may run concurrently and never run on a UI thread by
-  implication.
-- The engine shields jobs from callback exceptions.
-- WinUI view models must marshal progress onto their dispatcher.
-- Cancellation is cooperative; no worker is forcibly terminated.
+- Provider instances support calls from multiple workers.
+- Progress callbacks may be concurrent and are shielded from exceptions.
+- WinUI polling and callbacks marshal presentation changes to its dispatcher.
+- Cancellation is cooperative; workers are never forcibly terminated.
+- Capability discovery is immutable and cached after one guarded probe.

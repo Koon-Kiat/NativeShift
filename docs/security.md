@@ -24,16 +24,16 @@ All selected files are untrusted, including files with familiar extensions.
 - Logs omit full paths unless debug path logging is explicitly enabled.
 - No file contents or metadata are logged.
 
-## Residual Phase 1 risks
+## Residual risks
 
 Image decoding remains native parsing of hostile data. Keep vcpkg baselines and
 codec security updates current, fuzz provider entry points before public
 release, and run test/fuzz corpora under AddressSanitizer.
 
 Decoded pixels are held in one RGBA buffer. The pixel cap bounds a buffer to
-about 400 MiB, but several concurrent maximum-size images could still exhaust
-memory. Do not increase the default concurrency or safety limits without
-measurement. A future scheduler should admit jobs by estimated memory weight.
+about 400 MiB. The weighted scheduler reduces simultaneous expensive work, but
+the estimate cannot know the exact codec working set. Do not increase
+concurrency or limits without measurement.
 
 WebP decode is a single codec call over a read-only file mapping; cancellation
 is observed immediately before and after that call, not from inside it. JPEG
@@ -43,7 +43,7 @@ decode/encode API has the same between-call cancellation limitation as WebP.
 BMP and TIFF are decoded through Windows Imaging Component into the same
 bounded RGBA representation. Multi-page TIFF input uses only its first frame.
 
-Phase 1 does not sandbox codecs in a separate process. Before handling files
+NativeShift does not sandbox codecs in a separate process. Before handling files
 from high-risk adversarial sources, evaluate a low-privilege broker/provider
 process with job objects, memory limits, and a narrow IPC contract.
 
@@ -56,3 +56,9 @@ process with job objects, memory limits, and a narrow IPC contract.
 - Sign application binaries and installer.
 - Verify no debug path logging is enabled in release configuration.
 - Test standard-user execution; the manifest requests no elevation.
+
+FFmpeg return values, allocations, stream parameters, timestamps, resampler
+sizes, and dimension calculations are checked before use. Runtime hardware
+probing fails closed and automatic selection records a visible software
+fallback. Normal logs omit parent paths; debug paths require an explicit user
+choice. See [threat-model.md](threat-model.md) for other trust boundaries.

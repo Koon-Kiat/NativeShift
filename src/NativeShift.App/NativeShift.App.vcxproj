@@ -162,7 +162,9 @@
   <Target Name="CopyNativeShiftRuntime" AfterTargets="Build">
     <ItemGroup>
       <NativeShiftRuntime Include="$(NativeBuildRoot)\src\NativeShift.GuiBridge\NativeShift.GuiBridge.dll" />
-      <NativeShiftRuntime Include="$(NativeRuntimeRoot)\*.dll" />
+      <NativeShiftRuntime
+          Include="$(NativeRuntimeRoot)\*.dll"
+          Exclude="$(NativeRuntimeRoot)\gtest*.dll;$(NativeRuntimeRoot)\gmock*.dll;$(NativeRuntimeRoot)\pkgconf*.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(NativeShiftRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('%(NativeShiftRuntime.Identity)')" />
   </Target>
