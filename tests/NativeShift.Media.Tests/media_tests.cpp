@@ -10,12 +10,14 @@ extern "C" {
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <stop_token>
 #include <string>
+#include <string_view>
 
 #include <gtest/gtest.h>
 
@@ -265,14 +267,19 @@ bool WriteTestVideo(const std::filesystem::path& path,
             return false;
         }
         for (int row = 0; row < frame->height; ++row) {
-            std::fill_n(frame->data[0] + row * frame->linesize[0], frame->width,
+            const auto offset = static_cast<std::ptrdiff_t>(row) *
+                                static_cast<std::ptrdiff_t>(frame->linesize[0]);
+            std::fill_n(frame->data[0] + offset, frame->width,
                         static_cast<std::uint8_t>(40 + index * 20));
         }
         for (int row = 0; row < frame->height / 2; ++row) {
-            std::fill_n(frame->data[1] + row * frame->linesize[1],
-                        frame->width / 2, static_cast<std::uint8_t>(90));
-            std::fill_n(frame->data[2] + row * frame->linesize[2],
-                        frame->width / 2, static_cast<std::uint8_t>(160));
+            const auto chroma_offset =
+                static_cast<std::ptrdiff_t>(row) *
+                static_cast<std::ptrdiff_t>(frame->linesize[1]);
+            std::fill_n(frame->data[1] + chroma_offset, frame->width / 2,
+                        static_cast<std::uint8_t>(90));
+            std::fill_n(frame->data[2] + chroma_offset, frame->width / 2,
+                        static_cast<std::uint8_t>(160));
         }
         frame->pts = index;
         if (avcodec_send_frame(encoder_context, frame) < 0 || !drain()) {
@@ -291,10 +298,11 @@ bool WriteTestVideo(const std::filesystem::path& path,
             return false;
         }
         for (int sample = 0; sample < audio_samples; ++sample) {
+            const auto offset = static_cast<std::size_t>(sample) * 2U;
             const auto value = static_cast<std::int16_t>(
                 std::sin(static_cast<double>(sample) * 0.125663706) * 6'000.0);
-            packet->data[sample * 2] = static_cast<std::uint8_t>(value & 0xFF);
-            packet->data[sample * 2 + 1] = static_cast<std::uint8_t>(
+            packet->data[offset] = static_cast<std::uint8_t>(value & 0xFF);
+            packet->data[offset + 1U] = static_cast<std::uint8_t>(
                 (static_cast<std::uint16_t>(value) >> 8U) & 0xFFU);
         }
         packet->pts = 0;
@@ -474,3 +482,13 @@ TEST(MediaConversion, HonorsCancellationBeforeStarting) {
 }
 
 } // namespace
+
+int main(int argc, char** argv) {
+    if (argc == 3 && std::string_view(argv[1]) == "--write-smoke-video") {
+        const std::filesystem::path destination(argv[2]);
+        std::filesystem::create_directories(destination.parent_path());
+        return WriteTestVideo(destination, true) ? 0 : 1;
+    }
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}

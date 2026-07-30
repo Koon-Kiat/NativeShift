@@ -1,0 +1,68 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Project-owned native coverage
+    runs-on: windows-2025
+    timeout-minutes: 150
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\out\vcpkg-cache,readwrite
+      VCPKG_MAX_CONCURRENCY: 2
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: out/vcpkg-cache
+          key: coverage-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+      - name: Install pinned coverage tool
+        shell: pwsh
+        run: choco install opencppcoverage --version=0.9.9.0 --yes --no-progress
+      - name: Configure and build Debug
+        shell: pwsh
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          cmake --preset debug
+          cmake --build --preset debug
+      - name: Enforce line coverage gate
+        shell: pwsh
+        run: ./scripts/run-coverage.ps1 -MinimumLinePercent 65
+      - name: Upload human and machine reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: NativeShift-coverage
+          path: out/coverage/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Write job summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path ./out/coverage/cobertura.xml) {
+            [xml]$report = Get-Content ./out/coverage/cobertura.xml -Raw
+            $percent = [math]::Round([double]::Parse(
+              $report.coverage.'line-rate',
+              [Globalization.CultureInfo]::InvariantCulture) * 100, 2)
+            "## Native coverage`n`nProject-owned line coverage: **$percent%** (minimum 65%)." |
+              Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }

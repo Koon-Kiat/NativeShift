@@ -1,0 +1,9 @@
+* @Koon-Kiat
+
+/.github/ @Koon-Kiat
+/packaging/ @Koon-Kiat
+/scripts/build-packages.ps1 @Koon-Kiat
+/scripts/verify-packages.ps1 @Koon-Kiat
+/src/NativeShift.Core/ @Koon-Kiat
+/src/NativeShift.GuiBridge/ @Koon-Kiat
+/SECURITY.md @Koon-Kiat

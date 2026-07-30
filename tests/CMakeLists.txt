@@ -66,13 +66,29 @@ target_link_libraries(
     PRIVATE
         NativeShift::Core
         NativeShift::Media
-        GTest::gtest_main
+        GTest::gtest
         ${FFMPEG_LIBRARIES}
         nativeshift_project_options
 )
 
 include(GoogleTest)
-gtest_discover_tests(NativeShift.Core.Tests DISCOVERY_TIMEOUT 30)
-gtest_discover_tests(NativeShift.Image.Tests DISCOVERY_TIMEOUT 30)
-gtest_discover_tests(NativeShift.Media.Tests DISCOVERY_TIMEOUT 30)
-gtest_discover_tests(NativeShift.GuiBridge.Tests DISCOVERY_TIMEOUT 30)
+gtest_discover_tests(
+    NativeShift.Core.Tests
+    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 30
+)
+gtest_discover_tests(
+    NativeShift.Image.Tests
+    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 30
+)
+gtest_discover_tests(
+    NativeShift.Media.Tests
+    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 30
+)
+gtest_discover_tests(
+    NativeShift.GuiBridge.Tests
+    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 30
+)

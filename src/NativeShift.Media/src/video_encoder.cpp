@@ -660,8 +660,10 @@ ProviderOutcome EncodeVideo(const core::ConversionRequest& request,
                 audio_decoder_context->sample_fmt,
                 audio_decoder_context->sample_rate, 0, nullptr);
             audio_resampler.reset(raw_resampler);
-            if (status < 0 || !audio_resampler ||
-                (status = swr_init(audio_resampler.get())) < 0) {
+            if (status >= 0 && audio_resampler) {
+                status = swr_init(audio_resampler.get());
+            }
+            if (status < 0 || !audio_resampler) {
                 return Failure(
                     ErrorCategory::Codec,
                     "FFmpeg could not initialize video audio resampling",
