@@ -22,6 +22,9 @@
 
 #ifdef _WIN32
 #include <Windows.h>
+#include <propidl.h>
+#include <wincodec.h>
+#include <wrl/client.h>
 #endif
 
 namespace nativeshift::image {
@@ -445,6 +448,252 @@ bool DecodeWebP(const std::filesystem::path& path, PixelBuffer& pixels,
     return true;
 }
 
+#ifdef _WIN32
+class ComApartment {
+  public:
+    ComApartment() noexcept
+        : result_(::CoInitializeEx(nullptr, COINIT_MULTITHREADED)) {}
+
+    ~ComApartment() {
+        if (result_ == S_OK || result_ == S_FALSE) {
+            ::CoUninitialize();
+        }
+    }
+
+    [[nodiscard]] bool Available() const noexcept {
+        return SUCCEEDED(result_) || result_ == RPC_E_CHANGED_MODE;
+    }
+
+  private:
+    HRESULT result_{};
+};
+
+using Microsoft::WRL::ComPtr;
+
+bool CreateWicFactory(ComPtr<IWICImagingFactory>& factory,
+                      std::string& message) {
+    const HRESULT result =
+        ::CoCreateInstance(CLSID_WICImagingFactory2, nullptr,
+                           CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+    if (FAILED(result)) {
+        message = "Windows Imaging Component could not be initialized.";
+        return false;
+    }
+    return true;
+}
+
+bool DecodeWic(const std::filesystem::path& path, PixelBuffer& pixels,
+               std::string& message, const std::stop_token cancellation) {
+    if (cancellation.stop_requested()) {
+        message = "Conversion was cancelled.";
+        return false;
+    }
+    ComApartment apartment;
+    if (!apartment.Available()) {
+        message = "The Windows imaging apartment could not be initialized.";
+        return false;
+    }
+    ComPtr<IWICImagingFactory> factory;
+    if (!CreateWicFactory(factory, message)) {
+        return false;
+    }
+    ComPtr<IWICBitmapDecoder> decoder;
+    const auto extended = ExtendedPath(path);
+    if (FAILED(factory->CreateDecoderFromFilename(
+            extended.c_str(), nullptr, GENERIC_READ,
+            WICDecodeMetadataCacheOnDemand, &decoder))) {
+        message = "The BMP/TIFF input could not be decoded by Windows.";
+        return false;
+    }
+    ComPtr<IWICBitmapFrameDecode> frame;
+    if (FAILED(decoder->GetFrame(0, &frame))) {
+        message = "The first BMP/TIFF image frame could not be read.";
+        return false;
+    }
+    UINT width = 0;
+    UINT height = 0;
+    if (FAILED(frame->GetSize(&width, &height)) ||
+        !CheckDimensions(width, height, message)) {
+        if (message.empty()) {
+            message = "The BMP/TIFF dimensions could not be read.";
+        }
+        return false;
+    }
+    ComPtr<IWICFormatConverter> converter;
+    if (FAILED(factory->CreateFormatConverter(&converter)) ||
+        FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppRGBA,
+                                     WICBitmapDitherTypeNone, nullptr, 0.0,
+                                     WICBitmapPaletteTypeCustom))) {
+        message = "The BMP/TIFF pixel format is unsupported.";
+        return false;
+    }
+    const auto stride64 = static_cast<std::uint64_t>(width) * 4ULL;
+    const auto size64 = stride64 * static_cast<std::uint64_t>(height);
+    if (stride64 > std::numeric_limits<UINT>::max() ||
+        size64 > std::numeric_limits<UINT>::max()) {
+        message = "The decoded BMP/TIFF buffer exceeds Windows API limits.";
+        return false;
+    }
+    pixels.width = width;
+    pixels.height = height;
+    pixels.rgba.resize(static_cast<std::size_t>(size64));
+    if (FAILED(converter->CopyPixels(nullptr, static_cast<UINT>(stride64),
+                                     static_cast<UINT>(size64),
+                                     pixels.rgba.data()))) {
+        message = "The BMP/TIFF pixel data is malformed or unsupported.";
+        return false;
+    }
+    if (cancellation.stop_requested()) {
+        message = "Conversion was cancelled.";
+        return false;
+    }
+    return true;
+}
+
+std::uint16_t ReadExifOrientation(const std::filesystem::path& path) {
+    ComApartment apartment;
+    if (!apartment.Available()) {
+        return 1;
+    }
+    ComPtr<IWICImagingFactory> factory;
+    std::string ignored;
+    if (!CreateWicFactory(factory, ignored)) {
+        return 1;
+    }
+    ComPtr<IWICBitmapDecoder> decoder;
+    const auto extended = ExtendedPath(path);
+    if (FAILED(factory->CreateDecoderFromFilename(
+            extended.c_str(), nullptr, GENERIC_READ,
+            WICDecodeMetadataCacheOnDemand, &decoder))) {
+        return 1;
+    }
+    ComPtr<IWICBitmapFrameDecode> frame;
+    ComPtr<IWICMetadataQueryReader> metadata;
+    if (FAILED(decoder->GetFrame(0, &frame)) ||
+        FAILED(frame->GetMetadataQueryReader(&metadata))) {
+        return 1;
+    }
+    constexpr std::array queries{
+        L"/app1/ifd/{ushort=274}",
+        L"/ifd/{ushort=274}",
+    };
+    for (const auto* query : queries) {
+        PROPVARIANT value;
+        ::PropVariantInit(&value);
+        const HRESULT result = metadata->GetMetadataByName(query, &value);
+        std::uint16_t orientation = 1;
+        if (SUCCEEDED(result)) {
+            if (value.vt == VT_UI2) {
+                orientation = value.uiVal;
+            } else if (value.vt == VT_UI4 &&
+                       value.ulVal <=
+                           std::numeric_limits<std::uint16_t>::max()) {
+                orientation = static_cast<std::uint16_t>(value.ulVal);
+            }
+        }
+        ::PropVariantClear(&value);
+        if (orientation >= 1 && orientation <= 8) {
+            return orientation;
+        }
+    }
+    return 1;
+}
+
+bool EncodeWic(const std::filesystem::path& path,
+               const FileFormat output_format, const PixelBuffer& pixels,
+               const int compression_level, std::string& message,
+               const std::stop_token cancellation) {
+    if (cancellation.stop_requested()) {
+        message = "Conversion was cancelled.";
+        return false;
+    }
+    ComApartment apartment;
+    if (!apartment.Available()) {
+        message = "The Windows imaging apartment could not be initialized.";
+        return false;
+    }
+    ComPtr<IWICImagingFactory> factory;
+    if (!CreateWicFactory(factory, message)) {
+        return false;
+    }
+    const GUID container = output_format == FileFormat::Bmp
+                               ? GUID_ContainerFormatBmp
+                               : GUID_ContainerFormatTiff;
+    ComPtr<IWICStream> stream;
+    const auto extended = ExtendedPath(path);
+    if (FAILED(factory->CreateStream(&stream)) ||
+        FAILED(
+            stream->InitializeFromFilename(extended.c_str(), GENERIC_WRITE))) {
+        message = "The temporary BMP/TIFF output could not be opened.";
+        return false;
+    }
+    ComPtr<IWICBitmapEncoder> encoder;
+    if (FAILED(factory->CreateEncoder(container, nullptr, &encoder)) ||
+        FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache))) {
+        message = "The BMP/TIFF encoder could not be initialized.";
+        return false;
+    }
+    ComPtr<IWICBitmapFrameEncode> frame;
+    ComPtr<IPropertyBag2> properties;
+    if (FAILED(encoder->CreateNewFrame(&frame, &properties))) {
+        message = "The BMP/TIFF output frame could not be created.";
+        return false;
+    }
+    if (output_format == FileFormat::Tiff && properties) {
+        PROPBAG2 option{};
+        option.pstrName = const_cast<wchar_t*>(L"TiffCompressionMethod");
+        VARIANT value;
+        ::VariantInit(&value);
+        value.vt = VT_UI1;
+        value.bVal =
+            static_cast<BYTE>(compression_level == 0 ? WICTiffCompressionNone
+                                                     : WICTiffCompressionZIP);
+        if (FAILED(properties->Write(1, &option, &value))) {
+            ::VariantClear(&value);
+            message = "The TIFF compression option is unsupported.";
+            return false;
+        }
+        ::VariantClear(&value);
+    }
+    if (FAILED(frame->Initialize(properties.Get())) ||
+        FAILED(frame->SetSize(pixels.width, pixels.height))) {
+        message = "The BMP/TIFF output frame could not be initialized.";
+        return false;
+    }
+    WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
+    if (FAILED(frame->SetPixelFormat(&pixel_format))) {
+        message = "The BMP/TIFF output pixel format is unsupported.";
+        return false;
+    }
+    const auto stride64 = static_cast<std::uint64_t>(pixels.width) * 4ULL;
+    const auto size64 = stride64 * pixels.height;
+    if (stride64 > std::numeric_limits<UINT>::max() ||
+        size64 > std::numeric_limits<UINT>::max()) {
+        message = "The BMP/TIFF output exceeds Windows API limits.";
+        return false;
+    }
+    ComPtr<IWICBitmap> bitmap;
+    if (FAILED(factory->CreateBitmapFromMemory(
+            pixels.width, pixels.height, GUID_WICPixelFormat32bppRGBA,
+            static_cast<UINT>(stride64), static_cast<UINT>(size64),
+            const_cast<BYTE*>(pixels.rgba.data()), &bitmap))) {
+        message = "The BMP/TIFF output bitmap could not be created.";
+        return false;
+    }
+    ComPtr<IWICFormatConverter> converter;
+    if (FAILED(factory->CreateFormatConverter(&converter)) ||
+        FAILED(converter->Initialize(bitmap.Get(), pixel_format,
+                                     WICBitmapDitherTypeNone, nullptr, 0.0,
+                                     WICBitmapPaletteTypeCustom)) ||
+        FAILED(frame->WriteSource(converter.Get(), nullptr)) ||
+        FAILED(frame->Commit()) || FAILED(encoder->Commit())) {
+        message = "BMP/TIFF encoding failed.";
+        return false;
+    }
+    return !cancellation.stop_requested();
+}
+#endif
+
 std::pair<std::uint32_t, std::uint32_t>
 TargetDimensions(const PixelBuffer& source,
                  const nativeshift::core::ImageOptions& options) {
@@ -459,17 +708,44 @@ TargetDimensions(const PixelBuffer& source,
     double target_height =
         options.height ? static_cast<double>(*options.height) : source_height;
 
-    if (options.preserve_aspect_ratio) {
+    if (options.resize_mode == nativeshift::core::ImageResizeMode::Fit) {
         if (options.width && options.height) {
-            const double scale = std::min(target_width / source_width,
-                                          target_height / source_height);
+            double scale = std::min(target_width / source_width,
+                                    target_height / source_height);
+            if (options.prevent_enlargement) {
+                scale = std::min(scale, 1.0);
+            }
             target_width = source_width * scale;
             target_height = source_height * scale;
         } else if (options.width) {
+            if (options.prevent_enlargement) {
+                target_width = std::min(target_width, source_width);
+            }
             target_height = source_height * target_width / source_width;
         } else {
+            if (options.prevent_enlargement) {
+                target_height = std::min(target_height, source_height);
+            }
             target_width = source_width * target_height / source_height;
         }
+    } else if (options.resize_mode ==
+               nativeshift::core::ImageResizeMode::Fill) {
+        if (!options.width || !options.height) {
+            const double scale = options.width ? target_width / source_width
+                                               : target_height / source_height;
+            const double bounded_scale =
+                options.prevent_enlargement ? std::min(scale, 1.0) : scale;
+            target_width = source_width * bounded_scale;
+            target_height = source_height * bounded_scale;
+        } else if (options.prevent_enlargement &&
+                   (target_width > source_width ||
+                    target_height > source_height)) {
+            target_width = source_width;
+            target_height = source_height;
+        }
+    } else if (options.prevent_enlargement) {
+        target_width = std::min(target_width, source_width);
+        target_height = std::min(target_height, source_height);
     }
 
     const auto width = static_cast<std::uint32_t>(
@@ -497,25 +773,42 @@ bool Resize(PixelBuffer& pixels, const nativeshift::core::ImageOptions& options,
     resized.rgba.resize(static_cast<std::size_t>(target_width) * target_height *
                         4);
 
-    const double x_scale =
+    double x_scale =
         static_cast<double>(pixels.width) / static_cast<double>(target_width);
-    const double y_scale =
+    double y_scale =
         static_cast<double>(pixels.height) / static_cast<double>(target_height);
+    double x_offset = 0.0;
+    double y_offset = 0.0;
+    if (options.resize_mode == nativeshift::core::ImageResizeMode::Fill &&
+        options.width && options.height) {
+        const double scale =
+            std::max(static_cast<double>(target_width) / pixels.width,
+                     static_cast<double>(target_height) / pixels.height);
+        x_scale = 1.0 / scale;
+        y_scale = 1.0 / scale;
+        x_offset =
+            (static_cast<double>(pixels.width) - target_width * x_scale) / 2.0;
+        y_offset =
+            (static_cast<double>(pixels.height) - target_height * y_scale) /
+            2.0;
+    }
 
     for (std::uint32_t y = 0; y < target_height; ++y) {
         if (cancellation.stop_requested()) {
             message = "Conversion was cancelled.";
             return false;
         }
-        const double source_y =
-            std::max(0.0, (static_cast<double>(y) + 0.5) * y_scale - 0.5);
+        const double source_y = std::clamp(
+            y_offset + (static_cast<double>(y) + 0.5) * y_scale - 0.5, 0.0,
+            static_cast<double>(pixels.height - 1));
         const auto y0 = static_cast<std::uint32_t>(std::floor(source_y));
         const auto y1 = std::min(y0 + 1, pixels.height - 1);
         const double y_weight = source_y - static_cast<double>(y0);
 
         for (std::uint32_t x = 0; x < target_width; ++x) {
-            const double source_x =
-                std::max(0.0, (static_cast<double>(x) + 0.5) * x_scale - 0.5);
+            const double source_x = std::clamp(
+                x_offset + (static_cast<double>(x) + 0.5) * x_scale - 0.5, 0.0,
+                static_cast<double>(pixels.width - 1));
             const auto x0 = static_cast<std::uint32_t>(std::floor(source_x));
             const auto x1 = std::min(x0 + 1, pixels.width - 1);
             const double x_weight = source_x - static_cast<double>(x0);
@@ -549,6 +842,91 @@ bool Resize(PixelBuffer& pixels, const nativeshift::core::ImageOptions& options,
     }
     pixels = std::move(resized);
     return true;
+}
+
+bool ApplyOrientation(PixelBuffer& pixels, const std::uint16_t orientation,
+                      const std::stop_token cancellation,
+                      std::string& message) {
+    if (orientation <= 1 || orientation > 8) {
+        return true;
+    }
+    PixelBuffer transformed;
+    const bool swaps_dimensions = orientation >= 5;
+    transformed.width = swaps_dimensions ? pixels.height : pixels.width;
+    transformed.height = swaps_dimensions ? pixels.width : pixels.height;
+    transformed.rgba.resize(static_cast<std::size_t>(transformed.width) *
+                            transformed.height * 4);
+
+    for (std::uint32_t y = 0; y < transformed.height; ++y) {
+        if (cancellation.stop_requested()) {
+            message = "Conversion was cancelled.";
+            return false;
+        }
+        for (std::uint32_t x = 0; x < transformed.width; ++x) {
+            std::uint32_t source_x = x;
+            std::uint32_t source_y = y;
+            switch (orientation) {
+            case 2:
+                source_x = pixels.width - 1 - x;
+                break;
+            case 3:
+                source_x = pixels.width - 1 - x;
+                source_y = pixels.height - 1 - y;
+                break;
+            case 4:
+                source_y = pixels.height - 1 - y;
+                break;
+            case 5:
+                source_x = y;
+                source_y = x;
+                break;
+            case 6:
+                source_x = y;
+                source_y = pixels.height - 1 - x;
+                break;
+            case 7:
+                source_x = pixels.width - 1 - y;
+                source_y = pixels.height - 1 - x;
+                break;
+            case 8:
+                source_x = pixels.width - 1 - y;
+                source_y = x;
+                break;
+            default:
+                break;
+            }
+            const auto source_index =
+                (static_cast<std::size_t>(source_y) * pixels.width + source_x) *
+                4;
+            const auto destination_index =
+                (static_cast<std::size_t>(y) * transformed.width + x) * 4;
+            std::copy_n(pixels.rgba.data() + source_index, 4,
+                        transformed.rgba.data() + destination_index);
+        }
+    }
+    pixels = std::move(transformed);
+    return true;
+}
+
+void CompositeAlpha(PixelBuffer& pixels,
+                    const nativeshift::core::RgbaColor background) {
+    const std::array background_channels{
+        background.red,
+        background.green,
+        background.blue,
+    };
+    for (std::size_t index = 0; index < pixels.rgba.size(); index += 4) {
+        const auto alpha = static_cast<unsigned int>(pixels.rgba[index + 3]);
+        for (std::size_t channel = 0; channel < 3; ++channel) {
+            const auto color =
+                static_cast<unsigned int>(pixels.rgba[index + channel]);
+            const auto backdrop =
+                static_cast<unsigned int>(background_channels[channel]);
+            pixels.rgba[index + channel] = static_cast<std::uint8_t>(
+                (color * alpha + backdrop * (255U - alpha) + 127U) / 255U);
+        }
+        pixels.rgba[index + 3] = 255;
+    }
 }
 
 bool EncodePng(const std::filesystem::path& path, const PixelBuffer& pixels,
@@ -693,7 +1071,7 @@ int WebPProgress(const int percent, const WebPPicture* picture) {
 }
 
 bool EncodeWebP(const std::filesystem::path& path, const PixelBuffer& pixels,
-                const int quality, std::string& message,
+                const int quality, const bool lossless, std::string& message,
                 const ProgressCallback& progress,
                 const std::stop_token cancellation) {
     auto file = OpenFile(path, L"wb", "wb");
@@ -708,6 +1086,10 @@ bool EncodeWebP(const std::filesystem::path& path, const PixelBuffer& pixels,
         WebPValidateConfig(&config) == 0) {
         message = "The WebP encoder configuration is invalid.";
         return false;
+    }
+    config.lossless = lossless ? 1 : 0;
+    if (lossless) {
+        config.quality = 100.0F;
     }
     config.method = 4;
     config.thread_level = 1;
@@ -756,8 +1138,8 @@ std::string ImageConversionProvider::Name() const {
 
 bool ImageConversionProvider::CanHandle(
     const FileFormat input, const FileFormat output) const noexcept {
-    return nativeshift::core::IsPhase1ImageFormat(input) &&
-           nativeshift::core::IsPhase1ImageFormat(output);
+    return nativeshift::core::IsImageFormat(input) &&
+           nativeshift::core::IsImageFormat(output);
 }
 
 std::vector<nativeshift::core::ValidationIssue>
@@ -767,7 +1149,20 @@ ImageConversionProvider::Validate(
     if (!CanHandle(request.input_format, request.output_format)) {
         issues.push_back(
             {ErrorCategory::UnsupportedFormat, "unsupported_image_pair",
-             "The Phase 1 image provider supports only PNG, JPEG, and WebP."});
+             "The image provider supports PNG, JPEG, WebP, BMP, and TIFF."});
+    }
+    if (request.image.rotation_degrees != 0 &&
+        request.image.rotation_degrees != 90 &&
+        request.image.rotation_degrees != 180 &&
+        request.image.rotation_degrees != 270) {
+        issues.push_back(
+            {ErrorCategory::InvalidRequest, "rotation",
+             "Image rotation must be 0, 90, 180, or 270 degrees."});
+    }
+    if (request.image.compression_level < 0 ||
+        request.image.compression_level > 9) {
+        issues.push_back({ErrorCategory::InvalidRequest, "compression_level",
+                          "Image compression level must be between 0 and 9."});
     }
     return issues;
 }
@@ -807,6 +1202,14 @@ ProviderOutcome ImageConversionProvider::Convert(
     case FileFormat::WebP:
         decoded = DecodeWebP(request.input_path, pixels, message, cancellation);
         break;
+    case FileFormat::Bmp:
+    case FileFormat::Tiff:
+#ifdef _WIN32
+        decoded = DecodeWic(request.input_path, pixels, message, cancellation);
+#else
+        message = "BMP/TIFF conversion requires Windows Imaging Component.";
+#endif
+        break;
     default:
         return ProviderOutcome::Failed(
             ErrorCategory::UnsupportedFormat,
@@ -820,6 +1223,27 @@ ProviderOutcome ImageConversionProvider::Convert(
     }
     Report(progress, 0.35, "Image decoded");
 
+    if (request.image.automatic_orientation) {
+#ifdef _WIN32
+        const auto orientation = ReadExifOrientation(request.input_path);
+        if (!ApplyOrientation(pixels, orientation, cancellation, message)) {
+            return ProviderOutcome::Cancelled(std::move(message));
+        }
+#endif
+    }
+    std::uint16_t requested_orientation = 1;
+    if (request.image.rotation_degrees == 90) {
+        requested_orientation = 6;
+    } else if (request.image.rotation_degrees == 180) {
+        requested_orientation = 3;
+    } else if (request.image.rotation_degrees == 270) {
+        requested_orientation = 8;
+    }
+    if (!ApplyOrientation(pixels, requested_orientation, cancellation,
+                          message)) {
+        return ProviderOutcome::Cancelled(std::move(message));
+    }
+
     if (!Resize(pixels, request.image, progress, cancellation, message)) {
         return cancellation.stop_requested()
                    ? ProviderOutcome::Cancelled(std::move(message))
@@ -831,6 +1255,10 @@ ProviderOutcome ImageConversionProvider::Convert(
     }
 
     Report(progress, 0.65, "Encoding image");
+    if (request.output_format == FileFormat::Jpeg ||
+        request.output_format == FileFormat::Bmp) {
+        CompositeAlpha(pixels, request.image.background);
+    }
     bool encoded = false;
     switch (request.output_format) {
     case FileFormat::Png:
@@ -841,8 +1269,19 @@ ProviderOutcome ImageConversionProvider::Convert(
                              message, progress, cancellation);
         break;
     case FileFormat::WebP:
-        encoded = EncodeWebP(request.output_path, pixels, request.image.quality,
-                             message, progress, cancellation);
+        encoded =
+            EncodeWebP(request.output_path, pixels, request.image.quality,
+                       request.image.lossless, message, progress, cancellation);
+        break;
+    case FileFormat::Bmp:
+    case FileFormat::Tiff:
+#ifdef _WIN32
+        encoded =
+            EncodeWic(request.output_path, request.output_format, pixels,
+                      request.image.compression_level, message, cancellation);
+#else
+        message = "BMP/TIFF conversion requires Windows Imaging Component.";
+#endif
         break;
     default:
         return ProviderOutcome::Failed(
@@ -860,8 +1299,14 @@ ProviderOutcome ImageConversionProvider::Convert(
     auto outcome = ProviderOutcome::Succeeded();
     if (request.image.preserve_metadata) {
         outcome.warnings.push_back(
-            "Metadata preservation is not yet implemented by the Phase 1 "
-            "native image provider; metadata was removed.");
+            "This conversion path cannot preserve all metadata; metadata was "
+            "removed. Disable preservation or choose a metadata-capable "
+            "provider.");
+    }
+    if (request.image.preserve_color_profile) {
+        outcome.warnings.push_back(
+            "Colour-profile preservation is unavailable for this conversion "
+            "path; pixels were converted to sRGB-compatible RGBA.");
     }
     return outcome;
 }
@@ -869,8 +1314,10 @@ ProviderOutcome ImageConversionProvider::Convert(
 std::vector<nativeshift::core::FormatPair>
 ImageConversionProvider::GetSupportedFormats() const {
     std::vector<nativeshift::core::FormatPair> pairs;
-    constexpr std::array formats{FileFormat::Png, FileFormat::Jpeg,
-                                 FileFormat::WebP};
+    constexpr std::array formats{
+        FileFormat::Png, FileFormat::Jpeg, FileFormat::WebP,
+        FileFormat::Bmp, FileFormat::Tiff,
+    };
     for (const auto input : formats) {
         for (const auto output : formats) {
             pairs.push_back({input, output});
@@ -881,8 +1328,20 @@ ImageConversionProvider::GetSupportedFormats() const {
 
 std::vector<std::string> ImageConversionProvider::GetAvailableOptions() const {
     return {
-        "quality",           "width", "height", "preserve-aspect-ratio",
+        "quality",
+        "lossless",
+        "width",
+        "height",
+        "fit",
+        "fill",
+        "stretch",
+        "prevent-enlargement",
+        "rotation",
+        "automatic-orientation",
         "preserve-metadata",
+        "preserve-colour-profile",
+        "background-colour",
+        "compression-level",
     };
 }
 

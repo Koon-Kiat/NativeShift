@@ -6,7 +6,7 @@
 src/
   NativeShift.Core/   Models, detection, validation, output transaction,
                       provider registry, settings, logging, bounded queue
-  NativeShift.Image/  PNG/JPEG/WebP provider using native codec libraries
+  NativeShift.Image/  PNG/JPEG/WebP codecs plus Windows BMP/TIFF support
   NativeShift.Platform.Windows/
                       Windows storage and application-data services
   NativeShift.Cli/    Automation interface using the same engine and queue
@@ -68,15 +68,16 @@ small image and a memory-intensive video job do not count as equivalent work.
 
 ## Image provider choice
 
-The requested preference was libvips where practical. At the Phase 1 vcpkg
+The requested preference was libvips where practical. At the pinned vcpkg
 baseline there is no official libvips port. Maintaining an overlay port would
 add a large GLib stack and create project-owned package maintenance before the
-engine is validated. Phase 1 therefore uses official vcpkg ports for libpng,
-libjpeg-turbo, and libwebp.
+engine is validated. NativeShift therefore uses official vcpkg ports for
+libpng, libjpeg-turbo, and libwebp, plus Windows Imaging Component for BMP and
+TIFF.
 
-This decision is contained inside `NativeShift.Image`. A libvips or WIC provider
-can be registered later, ordered by capability, without changing requests,
-scheduling, CLI parsing, or transactional output behavior.
+This decision is contained inside `NativeShift.Image`. A future libvips
+provider can be registered later, ordered by capability, without changing
+requests, scheduling, CLI parsing, or transactional output behavior.
 
 ## Threading contract
 

@@ -34,6 +34,6 @@ enum class MediaKind { Unknown, Image, Audio, Video };
 FormatFromString(std::string_view value);
 [[nodiscard]] std::string_view ExtensionFor(FileFormat format) noexcept;
 [[nodiscard]] MediaKind KindOf(FileFormat format) noexcept;
-[[nodiscard]] bool IsPhase1ImageFormat(FileFormat format) noexcept;
+[[nodiscard]] bool IsImageFormat(FileFormat format) noexcept;
 
 } // namespace nativeshift::core

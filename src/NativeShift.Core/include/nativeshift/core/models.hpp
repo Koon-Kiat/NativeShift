@@ -45,6 +45,15 @@ enum class JobState {
 
 enum class ConversionOptionKind { Boolean, Integer, Text, Choice };
 
+enum class ImageResizeMode { Fit, Fill, Stretch };
+
+struct RgbaColor {
+    std::uint8_t red{255};
+    std::uint8_t green{255};
+    std::uint8_t blue{255};
+    std::uint8_t alpha{255};
+};
+
 struct ConversionOption {
     std::string key;
     std::string display_name;
@@ -55,10 +64,17 @@ struct ConversionOption {
 
 struct ImageOptions {
     int quality{85};
+    int compression_level{6};
     std::optional<std::uint32_t> width;
     std::optional<std::uint32_t> height;
-    bool preserve_aspect_ratio{true};
+    ImageResizeMode resize_mode{ImageResizeMode::Fit};
+    bool prevent_enlargement{false};
+    std::uint16_t rotation_degrees{0};
+    bool automatic_orientation{true};
+    bool lossless{false};
     bool preserve_metadata{false};
+    bool preserve_color_profile{false};
+    RgbaColor background;
 };
 
 struct ConversionRequest {
