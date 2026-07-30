@@ -226,8 +226,10 @@ ProviderOutcome CopyAudio(const core::ConversionRequest& request,
     const auto input_name = detail::PathToUtf8(request.input_path);
     int status =
         avformat_open_input(&input.value, input_name.c_str(), nullptr, nullptr);
-    if (status < 0 ||
-        (status = avformat_find_stream_info(input.value, nullptr)) < 0) {
+    if (status >= 0) {
+        status = avformat_find_stream_info(input.value, nullptr);
+    }
+    if (status < 0) {
         return cancellation.stop_requested()
                    ? ProviderOutcome::Cancelled("Audio conversion cancelled.")
                    : FfmpegFailure(ErrorCategory::InvalidInput,

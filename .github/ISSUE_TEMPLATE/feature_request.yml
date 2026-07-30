@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a focused NativeShift capability.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need
+      description: Explain the problem and expected local workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security, privacy, and licensing considerations
+      description: Include external tools, codecs, archives, or protected files.
+    validations:
+      required: true

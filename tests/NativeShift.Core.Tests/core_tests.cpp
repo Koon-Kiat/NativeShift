@@ -397,20 +397,22 @@ TEST(Presets, DuplicatesRenamesDeletesAndPersistsCustomPresets) {
     auto custom =
         nativeshift::core::PresetStore::Duplicate(built_in, "My JPEG");
     ASSERT_TRUE(custom.has_value());
-    EXPECT_FALSE(custom->built_in);
-    ASSERT_TRUE(
-        nativeshift::core::PresetStore::Rename(*custom, "My JPEG Updated"));
+    auto custom_preset = std::move(*custom);
+    EXPECT_FALSE(custom_preset.built_in);
+    ASSERT_TRUE(nativeshift::core::PresetStore::Rename(custom_preset,
+                                                       "My JPEG Updated"));
 
     const auto path = directory.Path() / "presets.json";
     nativeshift::core::PresetStore store(path);
-    std::vector<nativeshift::core::ConversionPreset> presets{*custom};
+    std::vector<nativeshift::core::ConversionPreset> presets{custom_preset};
     std::string error;
     ASSERT_TRUE(store.SaveCustom(presets, error)) << error;
     const auto loaded = store.LoadCustom();
     ASSERT_FALSE(loaded.recovered_from_error);
     ASSERT_EQ(loaded.presets.size(), 1U);
     EXPECT_EQ(loaded.presets.front().name, "My JPEG Updated");
-    EXPECT_TRUE(nativeshift::core::PresetStore::Delete(presets, custom->id));
+    EXPECT_TRUE(
+        nativeshift::core::PresetStore::Delete(presets, custom_preset.id));
     EXPECT_TRUE(presets.empty());
     EXPECT_FALSE(
         nativeshift::core::PresetStore::Delete(presets, "does-not-exist"));
@@ -541,8 +543,9 @@ TEST(JobQueue, CancelsAJobCooperatively) {
 
     auto handle = queue.TrySubmit(MakeRequest(input, output));
     ASSERT_TRUE(handle.has_value());
-    handle->Cancel();
-    EXPECT_EQ(handle->Get().status, ConversionStatus::Cancelled);
+    auto job = std::move(*handle);
+    job.Cancel();
+    EXPECT_EQ(job.Get().status, ConversionStatus::Cancelled);
     EXPECT_FALSE(std::filesystem::exists(output));
 }
 
@@ -559,9 +562,10 @@ TEST(JobQueue, PausesPendingWorkReliably) {
 
     auto handle = queue.TrySubmit(MakeRequest(input, output));
     ASSERT_TRUE(handle.has_value());
-    EXPECT_EQ(handle->WaitFor(30ms), std::future_status::timeout);
+    auto job = std::move(*handle);
+    EXPECT_EQ(job.WaitFor(30ms), std::future_status::timeout);
     queue.Resume();
-    EXPECT_EQ(handle->Get().status, ConversionStatus::Success);
+    EXPECT_EQ(job.Get().status, ConversionStatus::Success);
 }
 
 TEST(JobQueue, CancelsPendingWorkWhilePaused) {
@@ -576,9 +580,10 @@ TEST(JobQueue, CancelsPendingWorkWhilePaused) {
 
     auto handle = queue.TrySubmit(MakeRequest(input, output));
     ASSERT_TRUE(handle.has_value());
-    handle->Cancel();
-    ASSERT_EQ(handle->WaitFor(1s), std::future_status::ready);
-    EXPECT_EQ(handle->Get().status, ConversionStatus::Cancelled);
+    auto job = std::move(*handle);
+    job.Cancel();
+    ASSERT_EQ(job.WaitFor(1s), std::future_status::ready);
+    EXPECT_EQ(job.Get().status, ConversionStatus::Cancelled);
 }
 
 TEST(JobQueue, ExposesProgressAndFinalJobState) {
@@ -592,9 +597,10 @@ TEST(JobQueue, ExposesProgressAndFinalJobState) {
 
     auto handle = queue.TrySubmit(MakeRequest(input, output));
     ASSERT_TRUE(handle.has_value());
-    EXPECT_NE(handle->Snapshot().state, nativeshift::core::JobState::Failed);
-    EXPECT_EQ(handle->Get().status, ConversionStatus::Success);
-    const auto completed = handle->Snapshot();
+    auto job = std::move(*handle);
+    EXPECT_NE(job.Snapshot().state, nativeshift::core::JobState::Failed);
+    EXPECT_EQ(job.Get().status, ConversionStatus::Success);
+    const auto completed = job.Snapshot();
     EXPECT_EQ(completed.state, nativeshift::core::JobState::Completed);
     ASSERT_TRUE(completed.result.has_value());
     EXPECT_EQ(completed.progress.fraction, 1.0);
@@ -613,20 +619,22 @@ TEST(JobQueue, RequeuesFailedWorkWithModifiedSettings) {
 
     auto failed = queue.TrySubmit(MakeRequest(input, output));
     ASSERT_TRUE(failed.has_value());
-    EXPECT_EQ(failed->Get().status, ConversionStatus::Failed);
+    auto failed_job = std::move(*failed);
+    EXPECT_EQ(failed_job.Get().status, ConversionStatus::Failed);
 
     provider->fail = false;
     auto replacement = MakeRequest(input, directory.Path() / "retry.jpg");
-    auto retried = queue.Requeue(*failed, replacement);
+    auto retried = queue.Requeue(failed_job, replacement);
     ASSERT_TRUE(retried.has_value());
-    EXPECT_EQ(retried->Get().status, ConversionStatus::Success);
-    EXPECT_EQ(retried->Snapshot().request.output_path, replacement.output_path);
+    auto retried_job = std::move(*retried);
+    EXPECT_EQ(retried_job.Get().status, ConversionStatus::Success);
+    EXPECT_EQ(retried_job.Snapshot().request.output_path,
+              replacement.output_path);
 }
 
 TEST(JobQueue, UsesBoundedResourceWeights) {
     TemporaryDirectory directory;
     const auto input = directory.Path() / "source.png";
-    const auto output = directory.Path() / "result.jpg";
     WritePngSignature(input);
     ConversionEngine engine;
     engine.RegisterProvider(std::make_shared<FakeProvider>());

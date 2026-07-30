@@ -1,0 +1,90 @@
+name: Security gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Gitleaks full-history scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan tracked history
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  scorecard:
+    name: OpenSSF Scorecard
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@05b42c624433fc40578a4040d5cf5e36ddca8cde # v2.4.2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - name: Upload Scorecard SARIF
+        uses: github/codeql-action/upload-sarif@a2983b8bed1923f44751c5c43237f479442827b3 # v3.37.4
+        with:
+          sarif_file: results.sarif
+
+  asan:
+    name: AddressSanitizer
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\out\vcpkg-cache,readwrite
+      VCPKG_MAX_CONCURRENCY: 2
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: out/vcpkg-cache
+          key: asan-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+      - name: Configure AddressSanitizer
+        shell: pwsh
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          cmake --preset asan
+      - name: Build AddressSanitizer
+        shell: pwsh
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          cmake --build --preset asan
+      - name: Run representative tests
+        shell: pwsh
+        run: ctest --preset asan --timeout 180

@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible NativeShift defect without private media.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach confidential files, credentials, or exploit samples.
+  - type: input
+    id: version
+    attributes:
+      label: NativeShift version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use a tiny generated or public fixture where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result and privacy-safe diagnostics
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options: [WinUI, CLI, Image, Audio, Video, Packaging, Other]
+    validations:
+      required: true

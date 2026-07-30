@@ -16,7 +16,8 @@ class Logger {
     explicit Logger(std::filesystem::path log_path = DefaultLogPath(),
                     bool include_paths_in_debug = false,
                     LogLevel minimum_level = LogLevel::Information,
-                    std::uintmax_t maximum_file_bytes = 5U * 1024U * 1024U,
+                    std::uintmax_t maximum_file_bytes = std::uintmax_t{5} *
+                                                        1024U * 1024U,
                     std::size_t retained_files = 3);
 
     void Log(LogLevel level, std::string_view event, std::string_view message);

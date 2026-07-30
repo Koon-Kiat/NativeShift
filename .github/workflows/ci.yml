@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    name: Repository hygiene and workflow security
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate repository
+        shell: pwsh
+        run: ./scripts/check-repository.ps1
+      - name: Validate workflows
+        shell: pwsh
+        run: ./scripts/check-workflows.ps1
+
+  format:
+    name: Project formatting
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify clang-format
+        shell: pwsh
+        run: ./scripts/check-format.ps1
+
+  build-test:
+    name: ${{ matrix.configuration }} x64 build and tests
+    runs-on: windows-2025
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\out\vcpkg-cache,readwrite
+      VCPKG_MAX_CONCURRENCY: 2
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: out/vcpkg-cache
+          key: vcpkg-${{ runner.os }}-x64-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-${{ runner.os }}-x64-
+      - name: Configure
+        shell: pwsh
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          cmake --preset $env:CONFIGURATION.ToLowerInvariant()
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+      - name: Build
+        shell: pwsh
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          cmake --build --preset $env:CONFIGURATION.ToLowerInvariant()
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+      - name: Run unit and integration tests
+        shell: pwsh
+        run: >-
+          ctest --preset $env:CONFIGURATION.ToLowerInvariant()
+          --timeout 180
+          --output-junit "out/test-results-$($env:CONFIGURATION.ToLowerInvariant()).xml"
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+      - name: Run CLI smoke tests
+        shell: pwsh
+        run: ./scripts/run-cli-smoke.ps1 -Configuration $env:CONFIGURATION
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+      - name: Build WinUI and validate XAML
+        if: matrix.configuration == 'Release'
+        shell: pwsh
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          msbuild ./src/NativeShift.App/NativeShift.App.vcxproj `
+            /restore /m /p:Configuration=Release /p:Platform=x64 `
+            /p:AppxPackageSigningEnabled=false
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results-${{ matrix.configuration }}
+          path: |
+            out/test-results-*.xml
+            out/build/nativeshift-*/Testing/Temporary/
+          if-no-files-found: warn
+          retention-days: 7
