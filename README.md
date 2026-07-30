@@ -1,128 +1,110 @@
 # NativeShift
 
-NativeShift is a privacy-focused native Windows conversion engine.
-All file inspection and conversion happens in-process on the local computer.
-There are no uploads, accounts, advertisements, telemetry, or shell-based codec
-commands.
+NativeShift is a privacy-focused native Windows file converter. The WinUI 3
+application and automation-friendly CLI process files locally: no uploads,
+accounts, advertisements, telemetry, or shell-built codec commands.
 
-The repository is under active development. The shared C++23 engine, bounded
-job queue, complete still-image provider, command-line interface, and tests are
-implemented. Media and WinUI components are being added in subsequent commits.
+> Project status: release candidate. Image conversion is complete; native
+> FFmpeg audio conversion and video remux/software encoding are implemented.
+> Production MSIX signing and hardware-specific validation require the release
+> environment described below.
 
-## Current support
+![NativeShift logo](src/NativeShift.App/Assets/NativeShiftLogoMaster.png)
 
-| Input | Output | Provider |
+## Supported conversion
+
+| Kind | Inputs | Outputs |
 |---|---|---|
-| PNG | PNG, JPEG, WebP, BMP, TIFF | libpng / libjpeg-turbo / libwebp / WIC |
-| JPEG | PNG, JPEG, WebP, BMP, TIFF | libpng / libjpeg-turbo / libwebp / WIC |
-| WebP | PNG, JPEG, WebP, BMP, TIFF | libpng / libjpeg-turbo / libwebp / WIC |
-| BMP | PNG, JPEG, WebP, BMP, TIFF | Windows Imaging Component |
-| TIFF | PNG, JPEG, WebP, BMP, TIFF | Windows Imaging Component |
+| Image | PNG, JPEG, WebP, BMP, TIFF | PNG, JPEG, WebP, BMP, TIFF |
+| Audio | MP3, WAV, FLAC, AAC, M4A, OGG, Opus | MP3, WAV, FLAC, AAC, M4A, OGG, Opus |
+| Video | MP4, MKV, MOV, AVI, WebM | MP4, MKV, WebM |
 
-Image conversion supports JPEG/WebP quality, lossless WebP, optional width and
-height, fit/fill/stretch, enlargement prevention, EXIF orientation, rotation,
-alpha compositing, TIFF compression selection, conflict policies,
-cancellation, batch folders, recursive folders, configurable concurrency,
-Unicode paths, JSON output, and transactional temporary outputs.
+Images support quality/lossless controls, resize modes, EXIF orientation,
+rotation, alpha compositing, TIFF compression, conflict policies, and 25
+pairwise routes. Audio supports bitrate/VBR, sample rate, channels, metadata
+policy, and stream copy. Video supports remuxing, stream selection,
+metadata/subtitles, resolution, frame rate, quality/bitrate, H.264,
+H.265/HEVC, VP9, AV1, and runtime-probed NVENC/QSV/AMF/Media Foundation
+candidates with visible software fallback.
 
-Metadata is removed. `--preserve-metadata` and
-`--preserve-color-profile` emit explicit warnings when the selected native
-conversion path cannot honour them.
+The selected codec must be compatible with its container and available in the
+resolved FFmpeg build. NativeShift does not support animated/multi-page image
+output, document or archive conversion, DRM bypass, or password cracking.
 
-## Not yet supported
+## GUI
 
-- The WinUI 3 interface
-- Audio and video conversion or FFmpeg
-- Hardware acceleration
-- Office document conversion
-- Animated or multi-page images
-- EXIF orientation and metadata preservation
+The accessible WinUI queue supports drag-and-drop, file and recursive-folder
+pickers, search/type filters, presets, detailed format settings, bounded
+parallel work, per-job progress/details, pause/resume/cancel/retry/remove,
+conflict policies, capabilities, settings, logs, and diagnostics. State is
+never conveyed by color alone.
 
-These capabilities belong to later providers and do not require changes to the
-core scheduler or CLI architecture.
+## Build and test
 
-## Required tools
-
-- Windows 11 or a supported Windows 10 release
-- Visual Studio with the MSVC x64 C++ workload and a current Windows SDK
-- CMake 3.28 or newer
-- Ninja
-- vcpkg
-
-Visual Studio includes CMake, Ninja, and vcpkg when the corresponding components
-are selected. The presets read the vcpkg root from `VCPKG_ROOT`.
-
-## Build
-
-Run these commands from an x64 Developer PowerShell:
+Requirements are Windows 10/11 x64, Visual Studio with Desktop C++ and a
+current Windows SDK, CMake 3.28+, Ninja, and vcpkg.
 
 ```powershell
 $env:VCPKG_ROOT = "C:\path\to\vcpkg"
 cmake --preset debug
 cmake --build --preset debug
-```
+ctest --preset debug
 
-For an optimized build:
-
-```powershell
 cmake --preset release
 cmake --build --preset release
+ctest --preset release
 ```
 
-See [docs/building.md](docs/building.md) for complete setup, AddressSanitizer,
-and troubleshooting instructions.
-
-## Test
+Build the WinUI project after the CMake Release build:
 
 ```powershell
-ctest --preset debug
+msbuild .\src\NativeShift.App\NativeShift.App.vcxproj /restore `
+  /p:Configuration=Release /p:Platform=x64
 ```
 
-Fixtures are generated during tests; the repository does not contain large
-media files.
+See [building](docs/building.md) and [troubleshooting](docs/troubleshooting.md).
 
 ## CLI
 
 ```powershell
-.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe input.png --to webp --output output.webp
-.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe input.jpg --to png --width 1920
-.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe .\input-folder --to jpeg --output .\converted --recursive --jobs 4
-.\out\build\nativeshift-debug\src\NativeShift.Cli\nativeshift-cli.exe input.png --to webp --json
+nativeshift-cli input.png --to webp --quality 82
+nativeshift-cli input.wav --to mp3 --audio-bitrate 320k
+nativeshift-cli input.mkv --to mp4 --video-codec h264 --hardware auto
+nativeshift-cli .\input --to jpeg --output .\converted --recursive
+nativeshift-cli --list-formats --json
 ```
 
-Run `nativeshift-cli --help` for all options. Exit codes are `0` for success,
-`2` for command-line usage errors, `3` for invalid/unsupported input, `4` for
-conversion or I/O failures, and `130` for cancellation.
+JSON mode reserves standard output for stable JSON. See the
+[CLI reference](docs/cli.md) for presets, conflict policies, and exit codes.
 
-## Design and security
+## Packages
+
+```powershell
+.\scripts\build-packages.ps1 -Version 0.1.0
+.\scripts\verify-packages.ps1 -Version 0.1.0
+```
+
+The pipeline creates an x64 MSIX, portable GUI ZIP, CLI ZIP, symbols ZIP, SPDX
+JSON SBOM, release manifest, license bundle, and SHA-256 checksums. The checked
+in publisher is a placeholder; a protected subject-matched certificate is
+required for a trusted release. See [distribution](docs/distribution.md).
+
+## Privacy and security
+
+NativeShift detects content signatures, bounds decoded dimensions and queue
+resources, validates output paths, handles existing files explicitly, writes
+transactionally beside the destination, cleans incomplete output, and keeps
+privacy-filtered rotating local logs. Native codecs still parse untrusted data,
+so dependencies must remain patched and release security gates must pass.
 
 - [Architecture](docs/architecture.md)
-- [Adding a converter](docs/adding-a-converter.md)
-- [Security model](docs/security.md)
+- [User guide](docs/user-guide.md)
+- [Configuration](docs/configuration.md)
+- [Security controls](docs/security.md)
+- [Threat model](docs/threat-model.md)
 - [Performance](docs/performance.md)
+- [Licensing and codecs](docs/licensing.md)
+- [Release process](docs/releasing.md)
 
-The engine identifies files from their content rather than trusting extensions.
-It constrains decoded dimensions and file sizes, never builds shell commands,
-writes to a same-directory temporary file, and commits only after successful
-encoding.
-
-## Codec licensing and distribution
-
-Dependency installation for development does not automatically grant a
-distributor every obligation needed for a shipped product. The image provider
-uses libpng, libjpeg-turbo, libwebp, and Windows Imaging Component; each binary
-distribution must include the notices required by the exact versions in
-`vcpkg_installed`.
-
-libvips is not in the official vcpkg catalog at the pinned baseline, so
-NativeShift uses individual maintained codecs and Windows Imaging Component. A
-future libvips provider must account
-for libvips' LGPL terms and every enabled transitive codec. FFmpeg licensing is
-configuration-dependent: enabling GPL codecs changes the resulting binary's
-license obligations, and nonfree configurations are not redistributable under
-the normal FFmpeg terms. Audit the actual build configuration and obtain legal
-review before release.
-
-This repository does not yet declare a license for the application source.
-Choose and add one before accepting external contributions or distributing
-source/binaries.
+NativeShift is MIT licensed. Third-party and codec terms remain independent;
+see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
