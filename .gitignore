@@ -2,6 +2,10 @@
 /vcpkg_installed/
 /.vs/
 /.vscode/
+/src/NativeShift.App/Generated Files/
+/src/NativeShift.App/NativeShift.App/
+/src/NativeShift.App/obj/
+/src/NativeShift.App/x64/
 *.user
 *.suo
 *.log

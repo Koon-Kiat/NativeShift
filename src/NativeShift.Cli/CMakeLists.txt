@@ -15,6 +15,7 @@ target_link_libraries(
     PRIVATE
         NativeShift::Core
         NativeShift::Image
+        NativeShift::Media
         NativeShift::Platform.Windows
         nativeshift_project_options
 )

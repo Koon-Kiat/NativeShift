@@ -1,12 +1,18 @@
 #include "nativeshift/core/format_detector.hpp"
 #include "nativeshift/core/job_queue.hpp"
+#include "nativeshift/core/logger.hpp"
 #include "nativeshift/core/output_paths.hpp"
+#include "nativeshift/core/presets.hpp"
 #include "nativeshift/image/image_provider.hpp"
+#include "nativeshift/media/media_capabilities.hpp"
+#include "nativeshift/media/media_provider.hpp"
 #include "nativeshift/platform/windows_platform_services.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
@@ -43,12 +49,20 @@ struct CliOptions {
     OutputConflictPolicy conflict_policy{
         OutputConflictPolicy::GenerateUniqueName};
     nativeshift::core::ImageOptions image;
+    nativeshift::core::AudioOptions audio;
+    nativeshift::core::VideoOptions video;
     std::size_t jobs{nativeshift::core::JobQueue::SafeDefaultConcurrency()};
     bool recursive{false};
     bool json{false};
     bool help{false};
     bool version{false};
     bool list_formats{false};
+    bool list_codecs{false};
+    bool list_hardware{false};
+    bool list_presets{false};
+    bool capabilities{false};
+    bool verbose{false};
+    bool quiet{false};
 };
 
 struct ParseResult {
@@ -100,6 +114,107 @@ std::optional<int> ParseInteger(const std::wstring_view value) {
     }
 }
 
+std::optional<int> ParseBitrate(std::wstring_view value) {
+    if (!value.empty() && (value.back() == L'k' || value.back() == L'K')) {
+        value.remove_suffix(1);
+    }
+    return ParseInteger(value);
+}
+
+std::optional<double> ParseDouble(const std::wstring_view value) {
+    try {
+        std::size_t consumed = 0;
+        const double number = std::stod(std::wstring(value), &consumed);
+        if (consumed != value.size() || !std::isfinite(number)) {
+            return std::nullopt;
+        }
+        return number;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+std::optional<nativeshift::core::AudioCodec>
+ParseAudioCodec(const std::string_view value) {
+    using nativeshift::core::AudioCodec;
+    if (value == "auto") {
+        return AudioCodec::Automatic;
+    }
+    if (value == "mp3") {
+        return AudioCodec::Mp3;
+    }
+    if (value == "pcm" || value == "pcm_s16le") {
+        return AudioCodec::PcmS16;
+    }
+    if (value == "flac") {
+        return AudioCodec::Flac;
+    }
+    if (value == "aac") {
+        return AudioCodec::Aac;
+    }
+    if (value == "vorbis") {
+        return AudioCodec::Vorbis;
+    }
+    if (value == "opus") {
+        return AudioCodec::Opus;
+    }
+    if (value == "copy") {
+        return AudioCodec::Copy;
+    }
+    return std::nullopt;
+}
+
+std::optional<nativeshift::core::VideoCodec>
+ParseVideoCodec(const std::string_view value) {
+    using nativeshift::core::VideoCodec;
+    if (value == "auto") {
+        return VideoCodec::Automatic;
+    }
+    if (value == "h264") {
+        return VideoCodec::H264;
+    }
+    if (value == "h265" || value == "hevc") {
+        return VideoCodec::H265;
+    }
+    if (value == "vp9") {
+        return VideoCodec::Vp9;
+    }
+    if (value == "av1") {
+        return VideoCodec::Av1;
+    }
+    if (value == "copy") {
+        return VideoCodec::Copy;
+    }
+    return std::nullopt;
+}
+
+std::optional<nativeshift::core::VideoAudioCodec>
+ParseVideoAudioCodec(const std::string_view value) {
+    using nativeshift::core::VideoAudioCodec;
+    if (value == "auto") {
+        return VideoAudioCodec::Automatic;
+    }
+    if (value == "aac") {
+        return VideoAudioCodec::Aac;
+    }
+    if (value == "mp3") {
+        return VideoAudioCodec::Mp3;
+    }
+    if (value == "opus") {
+        return VideoAudioCodec::Opus;
+    }
+    if (value == "vorbis") {
+        return VideoAudioCodec::Vorbis;
+    }
+    if (value == "copy") {
+        return VideoAudioCodec::Copy;
+    }
+    if (value == "none") {
+        return VideoAudioCodec::None;
+    }
+    return std::nullopt;
+}
+
 std::optional<nativeshift::core::RgbaColor>
 ParseColor(std::wstring_view value) {
     if (!value.empty() && value.front() == L'#') {
@@ -125,10 +240,44 @@ ParseColor(std::wstring_view value) {
     }
 }
 
+bool ApplyPreset(CliOptions& options, const std::string_view name,
+                 std::string& error) {
+    auto presets = nativeshift::core::PresetStore::BuiltIns();
+    const auto custom = nativeshift::core::PresetStore().LoadCustom();
+    presets.insert(presets.end(), custom.presets.begin(), custom.presets.end());
+    const auto found =
+        std::ranges::find_if(presets, [name](const auto& preset) {
+            return preset.id == name || preset.name == name;
+        });
+    if (found == presets.end()) {
+        error = "The requested conversion preset was not found.";
+        return false;
+    }
+    options.output_format = found->output_format;
+    options.image = found->image;
+    options.audio = found->audio;
+    options.video = found->video;
+    return true;
+}
+
 ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
     CliOptions options;
     if (argc <= 1) {
         return {std::nullopt, "An input file or folder is required."};
+    }
+
+    for (int index = 1; index < argc; ++index) {
+        if (std::wstring_view(argv[index]) != L"--preset") {
+            continue;
+        }
+        if (index + 1 >= argc) {
+            return {std::nullopt, "--preset requires a preset ID or name."};
+        }
+        std::string error;
+        if (!ApplyPreset(options, NarrowAscii(argv[index + 1]), error)) {
+            return {std::nullopt, std::move(error)};
+        }
+        ++index;
     }
 
     for (int index = 1; index < argc; ++index) {
@@ -149,6 +298,14 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
             options.version = true;
         } else if (argument == L"--list-formats") {
             options.list_formats = true;
+        } else if (argument == L"--list-codecs") {
+            options.list_codecs = true;
+        } else if (argument == L"--list-hardware") {
+            options.list_hardware = true;
+        } else if (argument == L"--list-presets") {
+            options.list_presets = true;
+        } else if (argument == L"--capabilities") {
+            options.capabilities = true;
         } else if (argument == L"--to") {
             const auto value = require_value(L"--to");
             if (!value) {
@@ -156,9 +313,9 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
             }
             const auto format =
                 nativeshift::core::FormatFromString(NarrowAscii(*value));
-            if (!format || !nativeshift::core::IsImageFormat(*format)) {
-                return {std::nullopt,
-                        "--to must be png, jpeg, webp, bmp, or tiff."};
+            if (!format || *format == FileFormat::Mov ||
+                *format == FileFormat::Avi) {
+                return {std::nullopt, "--to is not a supported output format."};
             }
             options.output_format = *format;
         } else if (argument == L"--output" || argument == L"-o") {
@@ -181,6 +338,7 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
                 return {std::nullopt, "--width requires a positive integer."};
             }
             options.image.width = *number;
+            options.video.width = *number;
         } else if (argument == L"--height") {
             const auto value = require_value(L"--height");
             const auto number = value ? ParseDimension(*value) : std::nullopt;
@@ -188,6 +346,7 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
                 return {std::nullopt, "--height requires a positive integer."};
             }
             options.image.height = *number;
+            options.video.height = *number;
         } else if (argument == L"--lossless") {
             options.image.lossless = true;
         } else if (argument == L"--fit") {
@@ -213,8 +372,12 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
             options.image.automatic_orientation = false;
         } else if (argument == L"--preserve-metadata") {
             options.image.preserve_metadata = true;
+            options.audio.preserve_metadata = true;
+            options.video.preserve_metadata = true;
         } else if (argument == L"--remove-metadata") {
             options.image.preserve_metadata = false;
+            options.audio.preserve_metadata = false;
+            options.video.preserve_metadata = false;
         } else if (argument == L"--preserve-color-profile") {
             options.image.preserve_color_profile = true;
         } else if (argument == L"--background") {
@@ -233,10 +396,141 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
                         "--compression-level must be between 0 and 9."};
             }
             options.image.compression_level = *number;
+        } else if (argument == L"--audio-codec") {
+            const auto value = require_value(L"--audio-codec");
+            const auto codec =
+                value ? ParseAudioCodec(NarrowAscii(*value)) : std::nullopt;
+            if (!codec) {
+                return {std::nullopt,
+                        "--audio-codec must be auto, mp3, pcm_s16le, flac, "
+                        "aac, vorbis, opus, or copy."};
+            }
+            options.audio.codec = *codec;
+        } else if (argument == L"--audio-bitrate") {
+            const auto value = require_value(L"--audio-bitrate");
+            const auto number = value ? ParseBitrate(*value) : std::nullopt;
+            if (!number) {
+                return {std::nullopt,
+                        "--audio-bitrate requires an integer in kbps."};
+            }
+            options.audio.bitrate_kbps = *number;
+            options.video.audio_bitrate_kbps = *number;
+        } else if (argument == L"--vbr") {
+            options.audio.variable_bitrate = true;
+        } else if (argument == L"--sample-rate") {
+            const auto value = require_value(L"--sample-rate");
+            const auto number = value ? ParseInteger(*value) : std::nullopt;
+            if (!number) {
+                return {std::nullopt,
+                        "--sample-rate requires an integer in Hz."};
+            }
+            options.audio.sample_rate = *number;
+            options.video.audio_sample_rate = *number;
+        } else if (argument == L"--channels") {
+            const auto value = require_value(L"--channels");
+            const auto number = value ? ParseInteger(*value) : std::nullopt;
+            if (!number) {
+                return {std::nullopt, "--channels requires an integer."};
+            }
+            options.audio.channels = *number;
+            options.video.audio_channels = *number;
+        } else if (argument == L"--sample-format") {
+            const auto value = require_value(L"--sample-format");
+            if (!value || NarrowAscii(*value).empty()) {
+                return {std::nullopt, "--sample-format requires a value."};
+            }
+            options.audio.sample_format = NarrowAscii(*value);
+        } else if (argument == L"--video-codec") {
+            const auto value = require_value(L"--video-codec");
+            const auto codec =
+                value ? ParseVideoCodec(NarrowAscii(*value)) : std::nullopt;
+            if (!codec) {
+                return {std::nullopt,
+                        "--video-codec must be auto, h264, h265, vp9, av1, or "
+                        "copy."};
+            }
+            options.video.video_codec = *codec;
+        } else if (argument == L"--video-audio-codec") {
+            const auto value = require_value(L"--video-audio-codec");
+            const auto codec = value ? ParseVideoAudioCodec(NarrowAscii(*value))
+                                     : std::nullopt;
+            if (!codec) {
+                return {std::nullopt,
+                        "--video-audio-codec must be auto, aac, mp3, opus, "
+                        "vorbis, copy, or none."};
+            }
+            options.video.audio_codec = *codec;
+        } else if (argument == L"--video-bitrate") {
+            const auto value = require_value(L"--video-bitrate");
+            const auto number = value ? ParseBitrate(*value) : std::nullopt;
+            if (!number) {
+                return {std::nullopt,
+                        "--video-bitrate requires an integer in kbps."};
+            }
+            options.video.video_bitrate_kbps = *number;
+        } else if (argument == L"--video-quality") {
+            const auto value = require_value(L"--video-quality");
+            const auto number = value ? ParseInteger(*value) : std::nullopt;
+            if (!number) {
+                return {std::nullopt, "--video-quality requires an integer."};
+            }
+            options.video.quality = *number;
+        } else if (argument == L"--frame-rate") {
+            const auto value = require_value(L"--frame-rate");
+            const auto number = value ? ParseDouble(*value) : std::nullopt;
+            if (!number) {
+                return {std::nullopt, "--frame-rate requires a number."};
+            }
+            options.video.frame_rate = *number;
+        } else if (argument == L"--encoder-preset") {
+            const auto value = require_value(L"--preset");
+            if (!value || NarrowAscii(*value).empty()) {
+                return {std::nullopt, "--encoder-preset requires a value."};
+            }
+            options.video.encoder_preset = NarrowAscii(*value);
+        } else if (argument == L"--preset") {
+            const auto value = require_value(L"--preset");
+            if (!value) {
+                return {std::nullopt, "--preset requires a preset ID or name."};
+            }
+        } else if (argument == L"--hardware") {
+            const auto value = require_value(L"--hardware");
+            const auto mode = value ? NarrowAscii(*value) : std::string{};
+            if (mode == "auto" || mode == "automatic") {
+                options.video.hardware_acceleration =
+                    nativeshift::core::HardwareAcceleration::Automatic;
+            } else if (mode == "prefer") {
+                options.video.hardware_acceleration =
+                    nativeshift::core::HardwareAcceleration::PreferHardware;
+            } else if (mode == "software") {
+                options.video.hardware_acceleration =
+                    nativeshift::core::HardwareAcceleration::SoftwareOnly;
+            } else {
+                return {std::nullopt,
+                        "--hardware must be automatic, prefer, or software."};
+            }
+        } else if (argument == L"--encoder") {
+            const auto value = require_value(L"--encoder");
+            const auto encoder = value ? NarrowAscii(*value) : std::string{};
+            if (encoder.empty()) {
+                return {std::nullopt, "--encoder requires an FFmpeg encoder."};
+            }
+            options.video.hardware_acceleration =
+                nativeshift::core::HardwareAcceleration::Specific;
+            options.video.specific_encoder = encoder;
+        } else if (argument == L"--stream-copy") {
+            options.video.stream_copy = true;
+            options.video.video_codec = nativeshift::core::VideoCodec::Copy;
+        } else if (argument == L"--drop-subtitles") {
+            options.video.subtitles = nativeshift::core::SubtitleHandling::Drop;
         } else if (argument == L"--recursive") {
             options.recursive = true;
         } else if (argument == L"--json") {
             options.json = true;
+        } else if (argument == L"--verbose") {
+            options.verbose = true;
+        } else if (argument == L"--quiet") {
+            options.quiet = true;
         } else if (argument == L"--conflict") {
             const auto value = require_value(L"--conflict");
             if (!value) {
@@ -266,8 +560,13 @@ ParseResult ParseArguments(const int argc, wchar_t* argv[]) {
         }
     }
 
-    const bool informational =
-        options.help || options.version || options.list_formats;
+    const bool informational = options.help || options.version ||
+                               options.list_formats || options.list_codecs ||
+                               options.list_hardware || options.list_presets ||
+                               options.capabilities;
+    if (options.verbose && options.quiet) {
+        return {std::nullopt, "--verbose and --quiet cannot be used together."};
+    }
     if (!informational && options.input.empty()) {
         return {std::nullopt, "An input file or folder is required."};
     }
@@ -282,7 +581,7 @@ void PrintUsage() {
         << "NativeShift CLI " << NATIVESHIFT_VERSION << "\n\n"
         << "Usage:\n"
         << "  nativeshift-cli <input> --to "
-           "<png|jpeg|webp|bmp|tiff> [options]\n"
+           "<format> [options]\n"
         << "  nativeshift-cli --list-formats [--json]\n\n"
         << "Options:\n"
         << "  -o, --output <path>       Output file or folder\n"
@@ -299,33 +598,169 @@ void PrintUsage() {
         << "      --preserve-color-profile Request profile preservation\n"
         << "      --background <RRGGBB> Alpha background (default white)\n"
         << "      --compression-level <0-9> PNG/TIFF compression\n"
+        << "      --audio-codec <codec> Audio codec or copy\n"
+        << "      --audio-bitrate <kbps> Audio bitrate\n"
+        << "      --vbr                 Prefer variable-bitrate audio\n"
+        << "      --sample-rate <Hz>    Output audio sample rate\n"
+        << "      --channels <count>    Output audio channel count\n"
+        << "      --sample-format <fmt> FFmpeg audio sample format\n"
+        << "      --video-codec <codec> auto|h264|h265|vp9|av1|copy\n"
+        << "      --video-audio-codec <codec> Output video audio codec\n"
+        << "      --video-bitrate <kbps> Target video bitrate\n"
+        << "      --video-quality <0-63> Quality-based video encoding\n"
+        << "      --frame-rate <fps>    Output frame rate\n"
+        << "      --preset <id>         Apply a conversion preset\n"
+        << "      --encoder-preset <name> FFmpeg speed/quality preset\n"
+        << "      --hardware <mode>     automatic|prefer|software\n"
+        << "      --encoder <name>      Require a specific FFmpeg encoder\n"
+        << "      --stream-copy         Remux compatible streams\n"
+        << "      --drop-subtitles      Do not copy subtitle streams\n"
         << "      --conflict <policy>   ask|skip|replace|unique\n"
         << "      --jobs <1-32>         Maximum concurrent jobs\n"
         << "      --recursive           Recurse into an input folder\n"
         << "      --json                Emit machine-readable results\n"
+        << "      --verbose             Show conversion progress and debug "
+           "logs\n"
+        << "      --quiet               Suppress successful result messages\n"
         << "      --list-formats        List supported conversion pairs\n"
+        << "      --list-codecs         List detected FFmpeg encoders\n"
+        << "      --list-hardware       List detected hardware devices\n"
+        << "      --list-presets        List built-in and custom presets\n"
+        << "      --capabilities        Inspect codecs and hardware devices\n"
         << "      --version             Show application version\n"
         << "  -h, --help                Show this help\n";
 }
 
+void PrintCapabilities(const bool json, const bool include_encoders = true,
+                       const bool include_hardware = true) {
+    const auto& capabilities = nativeshift::media::DetectMediaCapabilities();
+    if (json) {
+        nlohmann::json output{
+            {"schema_version", 1},
+            {"application", "NativeShift"},
+            {"version", NATIVESHIFT_VERSION},
+            {"ffmpeg_version", capabilities.ffmpeg_version},
+            {"hardware_devices", nlohmann::json::array()},
+            {"encoders", nlohmann::json::array()},
+        };
+        if (include_hardware) {
+            for (const auto& device : capabilities.hardware_devices) {
+                output["hardware_devices"].push_back(
+                    {{"name", device.name},
+                     {"available", device.available},
+                     {"diagnostic", device.diagnostic}});
+            }
+        }
+        if (include_encoders) {
+            for (const auto& encoder : capabilities.encoders) {
+                output["encoders"].push_back(
+                    {{"name", encoder.name},
+                     {"codec", encoder.codec},
+                     {"registered", encoder.registered},
+                     {"hardware", encoder.hardware}});
+            }
+        }
+        std::cout << output.dump() << '\n';
+        return;
+    }
+    std::cout << "FFmpeg " << capabilities.ffmpeg_version << '\n';
+    if (include_hardware) {
+        for (const auto& device : capabilities.hardware_devices) {
+            std::cout << "Hardware device " << device.name << ": "
+                      << (device.available ? "available" : "unavailable")
+                      << '\n';
+        }
+    }
+    if (include_encoders) {
+        for (const auto& encoder : capabilities.encoders) {
+            if (encoder.registered) {
+                std::cout << "Encoder " << encoder.name << " (" << encoder.codec
+                          << ")\n";
+            }
+        }
+    }
+}
+
+void PrintPresets(const bool json) {
+    auto presets = nativeshift::core::PresetStore::BuiltIns();
+    const auto custom = nativeshift::core::PresetStore().LoadCustom();
+    presets.insert(presets.end(), custom.presets.begin(), custom.presets.end());
+    if (json) {
+        nlohmann::json output{
+            {"schema_version", 1},
+            {"application", "NativeShift"},
+            {"version", NATIVESHIFT_VERSION},
+            {"presets", nlohmann::json::array()},
+        };
+        for (const auto& preset : presets) {
+            output["presets"].push_back(
+                {{"id", preset.id},
+                 {"name", preset.name},
+                 {"media_kind", static_cast<int>(preset.media_kind)},
+                 {"output_format",
+                  nativeshift::core::ToString(preset.output_format)},
+                 {"built_in", preset.built_in}});
+        }
+        std::cout << output.dump() << '\n';
+        return;
+    }
+    for (const auto& preset : presets) {
+        std::cout << preset.id << " - " << preset.name << " -> "
+                  << nativeshift::core::ToString(preset.output_format)
+                  << (preset.built_in ? " (built-in)" : " (custom)") << '\n';
+    }
+    if (!custom.warning.empty()) {
+        std::cerr << "Warning: " << custom.warning << '\n';
+    }
+}
+
 void PrintFormats(const bool json) {
-    constexpr std::array formats{
+    constexpr std::array image_formats{
         std::string_view{"png"},  std::string_view{"jpeg"},
         std::string_view{"webp"}, std::string_view{"bmp"},
         std::string_view{"tiff"},
+    };
+    constexpr std::array audio_formats{
+        std::string_view{"mp3"},  std::string_view{"wav"},
+        std::string_view{"flac"}, std::string_view{"aac"},
+        std::string_view{"m4a"},  std::string_view{"ogg"},
+        std::string_view{"opus"},
+    };
+    constexpr std::array video_inputs{
+        std::string_view{"mp4"},  std::string_view{"mkv"},
+        std::string_view{"mov"},  std::string_view{"avi"},
+        std::string_view{"webm"},
+    };
+    constexpr std::array video_outputs{
+        std::string_view{"mp4"},
+        std::string_view{"mkv"},
+        std::string_view{"webm"},
     };
     if (json) {
         nlohmann::json output{
             {"schema_version", 1},
             {"application", "NativeShift"},
             {"version", NATIVESHIFT_VERSION},
-            {"input_formats", formats},
-            {"output_formats", formats},
+            {"input_formats",
+             {"png", "jpeg", "webp", "bmp", "tiff", "mp3", "wav", "flac", "aac",
+              "m4a", "ogg", "opus", "mp4", "mkv", "mov", "avi", "webm"}},
+            {"output_formats",
+             {"png", "jpeg", "webp", "bmp", "tiff", "mp3", "wav", "flac", "aac",
+              "m4a", "ogg", "opus", "mp4", "mkv", "webm"}},
+            {"image_input_formats", image_formats},
+            {"image_output_formats", image_formats},
+            {"audio_input_formats", audio_formats},
+            {"audio_output_formats", audio_formats},
+            {"video_input_formats", video_inputs},
+            {"video_output_formats", video_outputs},
         };
         std::cout << output.dump() << '\n';
         return;
     }
-    std::cout << "Image input/output: png, jpeg, webp, bmp, tiff\n";
+    std::cout << "Image input/output: png, jpeg, webp, bmp, tiff\n"
+              << "Audio input/output: mp3, wav, flac, aac, m4a, ogg, opus\n"
+              << "Video input: mp4, mkv, mov, avi, webm\n"
+              << "Video output: mp4, mkv, webm\n";
 }
 
 std::vector<std::filesystem::path> CollectInputs(const CliOptions& options,
@@ -352,7 +787,7 @@ std::vector<std::filesystem::path> CollectInputs(const CliOptions& options,
             return;
         }
         const auto detection = nativeshift::core::DetectFormat(entry.path());
-        if (nativeshift::core::IsImageFormat(detection.format)) {
+        if (detection.format != FileFormat::Unknown) {
             inputs.push_back(entry.path());
         }
     };
@@ -396,7 +831,7 @@ std::vector<std::filesystem::path> CollectInputs(const CliOptions& options,
         return {};
     }
     if (inputs.empty()) {
-        error = "No supported image files were found.";
+        error = "No supported media files were found.";
     }
     return inputs;
 }
@@ -480,6 +915,8 @@ BuildRequests(const CliOptions& options,
         request.output_format = options.output_format;
         request.conflict_policy = options.conflict_policy;
         request.image = options.image;
+        request.audio = options.audio;
+        request.video = options.video;
         requests.push_back(std::move(request));
     }
     return requests;
@@ -487,10 +924,13 @@ BuildRequests(const CliOptions& options,
 
 nlohmann::json ResultJson(const ConversionResult& result) {
     nlohmann::json json{
+        {"job_id", result.job_id},
         {"status", nativeshift::core::ToString(result.status)},
         {"error_category", nativeshift::core::ToString(result.error)},
         {"message", result.message},
         {"provider", result.provider},
+        {"selected_codec", result.selected_codec},
+        {"hardware_acceleration", result.hardware_acceleration},
         {"input_format", nativeshift::core::ToString(result.input_format)},
         {"output_format", nativeshift::core::ToString(result.output_format)},
         {"duration_ms", result.duration.count()},
@@ -557,6 +997,22 @@ int wmain(const int argc, wchar_t* argv[]) {
         PrintFormats(options.json);
         return 0;
     }
+    if (options.list_codecs) {
+        PrintCapabilities(options.json, true, false);
+        return 0;
+    }
+    if (options.list_hardware) {
+        PrintCapabilities(options.json, false, true);
+        return 0;
+    }
+    if (options.list_presets) {
+        PrintPresets(options.json);
+        return 0;
+    }
+    if (options.capabilities) {
+        PrintCapabilities(options.json);
+        return 0;
+    }
 
     std::string error;
     const auto inputs = CollectInputs(options, error);
@@ -571,11 +1027,17 @@ int wmain(const int argc, wchar_t* argv[]) {
     }
 
     std::signal(SIGINT, HandleInterrupt);
-    nativeshift::core::Logger logger;
+    nativeshift::core::Logger logger(
+        nativeshift::core::Logger::DefaultLogPath(), options.verbose,
+        options.verbose ? nativeshift::core::LogLevel::Debug
+        : options.quiet ? nativeshift::core::LogLevel::Error
+                        : nativeshift::core::LogLevel::Information);
     nativeshift::platform::WindowsPlatformServices platform;
     nativeshift::core::ConversionEngine engine(&logger, &platform);
     engine.RegisterProvider(
         std::make_shared<nativeshift::image::ImageConversionProvider>());
+    engine.RegisterProvider(
+        std::make_shared<nativeshift::media::MediaConversionProvider>());
     nativeshift::core::JobQueue queue(engine, options.jobs, 64);
 
     std::vector<nativeshift::core::JobHandle> active;
@@ -587,7 +1049,24 @@ int wmain(const int argc, wchar_t* argv[]) {
     while (next < requests->size() || !active.empty()) {
         while (!interrupted.load(std::memory_order_relaxed) &&
                next < requests->size() && active.size() < options.jobs + 64) {
-            auto handle = queue.TrySubmit(std::move((*requests)[next]));
+            auto input_name =
+                PathToUtf8((*requests)[next].input_path.filename());
+            auto progress =
+                options.verbose && !options.json && !options.quiet
+                    ? nativeshift::core::ProgressCallback(
+                          [input_name = std::move(input_name)](
+                              const nativeshift::core::ConversionProgress&
+                                  update) {
+                              std::cerr
+                                  << "[progress] " << input_name << ' '
+                                  << static_cast<int>(
+                                         std::clamp(update.fraction, 0.0, 1.0) *
+                                         100.0)
+                                  << "% " << update.stage << '\n';
+                          })
+                    : nativeshift::core::ProgressCallback{};
+            auto handle = queue.TrySubmit(std::move((*requests)[next]),
+                                          std::move(progress));
             if (!handle) {
                 break;
             }
@@ -607,7 +1086,8 @@ int wmain(const int argc, wchar_t* argv[]) {
                 continue;
             }
             auto result = iterator->Get();
-            if (!options.json) {
+            if (!options.json && (!options.quiet ||
+                                  result.status != ConversionStatus::Success)) {
                 std::cout << '[' << nativeshift::core::ToString(result.status)
                           << "] " << result.message;
                 if (!result.output_path.empty()) {

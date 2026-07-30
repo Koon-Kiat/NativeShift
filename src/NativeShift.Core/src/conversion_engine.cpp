@@ -36,6 +36,7 @@ ConversionResult Failure(const ErrorCategory category, std::string message,
                          const ConversionRequest& request,
                          const std::chrono::steady_clock::time_point started) {
     ConversionResult result;
+    result.job_id = request.job_id;
     result.status = category == ErrorCategory::Cancelled
                         ? ConversionStatus::Cancelled
                         : ConversionStatus::Failed;
@@ -137,6 +138,7 @@ ConversionResult ConversionEngine::Convert(ConversionRequest request,
         }
         if (resolution.skip) {
             ConversionResult result;
+            result.job_id = request.job_id;
             result.status = ConversionStatus::Skipped;
             result.error = ErrorCategory::None;
             result.message = "The output already exists and was skipped.";
@@ -194,6 +196,9 @@ ConversionResult ConversionEngine::Convert(ConversionRequest request,
                                                 : std::move(outcome.message),
                         request, started);
             result.provider = provider->Name();
+            result.selected_codec = std::move(outcome.selected_codec);
+            result.hardware_acceleration =
+                std::move(outcome.hardware_acceleration);
             result.warnings = std::move(outcome.warnings);
             return finish(std::move(result));
         }
@@ -206,6 +211,9 @@ ConversionResult ConversionEngine::Convert(ConversionRequest request,
                     : std::move(outcome.message),
                 request, started);
             result.provider = provider->Name();
+            result.selected_codec = std::move(outcome.selected_codec);
+            result.hardware_acceleration =
+                std::move(outcome.hardware_acceleration);
             result.warnings = std::move(outcome.warnings);
             return finish(std::move(result));
         }
@@ -225,10 +233,13 @@ ConversionResult ConversionEngine::Convert(ConversionRequest request,
 
         ReportProgressSafely(progress, {1.0, "Completed"});
         ConversionResult result;
+        result.job_id = request.job_id;
         result.status = ConversionStatus::Success;
         result.error = ErrorCategory::None;
         result.message = "Conversion completed successfully.";
         result.provider = provider->Name();
+        result.selected_codec = std::move(outcome.selected_codec);
+        result.hardware_acceleration = std::move(outcome.hardware_acceleration);
         result.input_format = request.input_format;
         result.output_format = request.output_format;
         result.output_path = final_path;

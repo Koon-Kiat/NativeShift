@@ -8,6 +8,7 @@ add_library(
     src/job_queue.cpp
     src/logger.cpp
     src/output_paths.cpp
+    src/presets.cpp
     src/provider_registry.cpp
     src/settings.cpp
     src/validation.cpp
