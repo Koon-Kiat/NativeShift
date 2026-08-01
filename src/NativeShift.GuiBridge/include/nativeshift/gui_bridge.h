@@ -30,6 +30,9 @@ nativeshift_job_json(std::uint64_t job_id, wchar_t* destination,
 NATIVESHIFT_GUI_API std::size_t
 nativeshift_queue_json(wchar_t* destination, std::size_t destination_size);
 NATIVESHIFT_GUI_API std::size_t
+nativeshift_detect_format(const wchar_t* input_path, wchar_t* destination,
+                          std::size_t destination_size);
+NATIVESHIFT_GUI_API std::size_t
 nativeshift_capabilities_json(wchar_t* destination,
                               std::size_t destination_size);
 NATIVESHIFT_GUI_API std::size_t

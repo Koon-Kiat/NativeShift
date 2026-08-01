@@ -4,6 +4,7 @@
 #include "QueueViewModel.h"
 
 #include <filesystem>
+#include <optional>
 #include <vector>
 
 namespace winrt::NativeShift::implementation {
@@ -11,10 +12,27 @@ namespace winrt::NativeShift::implementation {
 struct MainWindow : MainWindowT<MainWindow> {
     MainWindow();
 
-    void Navigation_SelectionChanged(
-        Microsoft::UI::Xaml::Controls::NavigationView const&,
-        Microsoft::UI::Xaml::Controls::
-            NavigationViewSelectionChangedEventArgs const& event);
+    void ToggleSidebar_Click(IInspectable const&,
+                             Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void SidebarNavigation_Click(IInspectable const&,
+                                 Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void MenuNavigate_Click(IInspectable const&,
+                            Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void Back_Click(IInspectable const&,
+                    Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void Forward_Click(IInspectable const&,
+                       Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void OpenQueue_Click(IInspectable const&,
+                         Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void ToggleOptions_Click(IInspectable const&,
+                             Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void NewConversion_Click(IInspectable const&,
+                             Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void ClearCurrentSession_Click(IInspectable const&,
+                                   Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void SidebarJob_ItemClick(
+        IInspectable const&,
+        Microsoft::UI::Xaml::Controls::ItemClickEventArgs const& event);
     winrt::fire_and_forget
     AddFiles_Click(IInspectable const&,
                    Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -35,9 +53,16 @@ struct MainWindow : MainWindowT<MainWindow> {
     void StateFilter_SelectionChanged(
         IInspectable const&,
         Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+    void QueueTypeFilter_SelectionChanged(
+        IInspectable const&,
+        Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
     void QueueList_SelectionChanged(
         IInspectable const&,
         Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+    void DetectedType_Click(IInspectable const&,
+                            Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void OpenSettings_Click(IInspectable const&,
+                            Microsoft::UI::Xaml::RoutedEventArgs const&);
     void Convert_Click(IInspectable const&,
                        Microsoft::UI::Xaml::RoutedEventArgs const&);
     void Pause_Click(IInspectable const&,
@@ -79,10 +104,37 @@ struct MainWindow : MainWindowT<MainWindow> {
     SelectedComboText(Microsoft::UI::Xaml::Controls::ComboBox combo);
     [[nodiscard]] std::wstring BuildOptionsJson();
     void LoadSettings();
-    void SelectOutputFormat(std::wstring_view value);
+    void ApplyConversionKind(::NativeShift::presentation::ConversionKind kind);
+    [[nodiscard]] ::NativeShift::presentation::ConversionKind
+    QueueTypeFilterKind();
+    [[nodiscard]] Microsoft::UI::Xaml::Controls::ComboBox ActiveOutputFormat();
+    void SelectOutputFormat(Microsoft::UI::Xaml::Controls::ComboBox combo,
+                            std::wstring_view value);
+    void ShowQueuePage();
+    void UpdateActionStates();
+    void UpdateAddedFiles();
+    void SelectNavigationTag(std::wstring_view tag);
+    void UpdateNavigationButtons();
+    void NavigateTo(std::wstring_view tag, bool record_history);
+    void UpdateSidebarSelection(std::wstring_view tag);
+    void SetSidebarOpen(bool open);
+    void ResetCurrentSession(std::wstring_view status);
+    winrt::fire_and_forget LoadImagePreview(std::filesystem::path path,
+                                            std::uint64_t request);
 
     ::NativeShift::presentation::QueueViewModel view_model_;
+    ::NativeShift::presentation::ConversionKind active_kind_{
+        ::NativeShift::presentation::ConversionKind::Unknown};
     std::vector<std::size_t> visible_indices_;
+    std::vector<std::wstring> queue_item_texts_;
+    std::vector<std::wstring> added_file_texts_;
+    std::vector<std::size_t> sidebar_job_indices_;
+    std::vector<std::wstring> sidebar_job_texts_;
+    std::vector<std::wstring> navigation_history_;
+    std::size_t navigation_position_{};
+    bool refreshing_view_{false};
+    bool sidebar_open_{true};
+    std::uint64_t preview_request_{};
     Microsoft::UI::Xaml::DispatcherTimer refresh_timer_;
 };
 

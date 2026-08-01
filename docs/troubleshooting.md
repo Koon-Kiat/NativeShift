@@ -29,7 +29,9 @@ permissions. Cancellation and errors intentionally remove partial output.
 
 The repository uses a development publisher placeholder and does not contain a
 trusted certificate. Use a correctly subject-matched trusted development
-certificate for local tests or a protected production certificate for release.
+certificate for package tests or a protected production certificate for
+release. For normal use, download the portable ZIP, extract it, and launch
+`NativeShift.exe`; it does not require MSIX installation.
 
 ## WinUI cannot locate the bridge DLL
 

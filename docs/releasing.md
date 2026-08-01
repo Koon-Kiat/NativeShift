@@ -8,7 +8,8 @@ NativeShift uses Semantic Versioning.
 3. Configure and build clean Debug and Release trees.
 4. Run CTest, CLI smokes, formatting, static analysis, sanitizer tests where
    supported, and the core benchmark.
-5. Build WinUI and its MSIX, then build and verify every package candidate.
+5. Build WinUI, then build and verify the portable GUI, CLI, symbols, and
+   metadata candidates. Build the optional MSIX only when signing is available.
 6. Inspect the SPDX SBOM, release manifest, checksums, and provenance inputs.
 7. Test installation, startup, conversion, and uninstall on a clean Windows
    machine. Confirm user output is retained.

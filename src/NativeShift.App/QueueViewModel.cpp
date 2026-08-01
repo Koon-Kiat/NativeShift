@@ -36,6 +36,16 @@ std::wstring ReadJob(const std::uint64_t id) {
     return value;
 }
 
+std::wstring ReadFormat(const std::filesystem::path& input) {
+    const auto required = nativeshift_detect_format(input.c_str(), nullptr, 0);
+    if (required <= 1) {
+        return L"unknown";
+    }
+    std::wstring value(required - 1, L'\0');
+    (void)nativeshift_detect_format(input.c_str(), value.data(), required);
+    return value;
+}
+
 std::wstring JsonString(const JsonObject& object, const wchar_t* key,
                         std::wstring fallback = {}) {
     if (!object.HasKey(key) ||
@@ -53,6 +63,31 @@ std::wstring Lowercase(std::wstring value) {
     return value;
 }
 
+ConversionKind KindForFormat(const std::wstring_view format) noexcept {
+    if (format == L"png" || format == L"jpeg" || format == L"webp" ||
+        format == L"bmp" || format == L"tiff") {
+        return ConversionKind::Image;
+    }
+    if (format == L"mp3" || format == L"wav" || format == L"flac" ||
+        format == L"aac" || format == L"m4a" || format == L"ogg" ||
+        format == L"opus") {
+        return ConversionKind::Audio;
+    }
+    if (format == L"mp4" || format == L"mkv" || format == L"mov" ||
+        format == L"avi" || format == L"webm") {
+        return ConversionKind::Video;
+    }
+    return ConversionKind::Unknown;
+}
+
+std::wstring HumanizeState(std::wstring value) {
+    std::ranges::replace(value, L'_', L' ');
+    if (!value.empty()) {
+        value.front() = static_cast<wchar_t>(std::towupper(value.front()));
+    }
+    return value;
+}
+
 std::filesystem::path BuildOutput(const std::filesystem::path& input,
                                   const std::filesystem::path& directory,
                                   const std::wstring_view format) {
@@ -64,17 +99,37 @@ std::filesystem::path BuildOutput(const std::filesystem::path& input,
     auto output = directory / (stem.native() + L"." + extension);
     std::error_code error;
     if (std::filesystem::equivalent(input, output, error) && !error) {
-        output = directory / (stem.native() + L" - converted." + extension);
+        output = directory / (stem.native() + L" - NativeShift." + extension);
     }
     return output;
 }
 
 } // namespace
 
+std::wstring_view ConversionKindName(const ConversionKind kind) noexcept {
+    switch (kind) {
+    case ConversionKind::Image:
+        return L"Image";
+    case ConversionKind::Audio:
+        return L"Audio";
+    case ConversionKind::Video:
+        return L"Video";
+    case ConversionKind::All:
+        return L"All";
+    case ConversionKind::Unknown:
+    default:
+        return L"Unknown";
+    }
+}
+
 std::wstring QueueRow::DisplayText() const {
     std::wostringstream stream;
-    stream << input_path.filename().native() << L"  |  " << input_format
-           << L" -> " << output_format << L"  |  " << state << L"  |  "
+    stream << input_path.filename().native() << L"\n"
+           << ConversionKindName(kind) << L"  ·  " << input_format;
+    if (!output_format.empty()) {
+        stream << L" → " << output_format;
+    }
+    stream << L"  ·  " << HumanizeState(state) << L"  ·  "
            << static_cast<int>(std::clamp(progress, 0.0, 1.0) * 100.0) << L"%";
     if (!codec.empty()) {
         stream << L"  |  " << codec;
@@ -96,7 +151,6 @@ std::wstring QueueRow::DetailText() const {
     if (!codec.empty()) {
         stream << L"\nCodec: " << codec;
     }
-    stream << L"\nAcceleration: " << acceleration;
     if (duration_ms > 0) {
         stream << L"\nElapsed: " << duration_ms << L" ms";
     }
@@ -123,23 +177,33 @@ void QueueViewModel::AddFiles(const std::vector<std::filesystem::path>& paths) {
         const auto duplicate =
             std::ranges::any_of(rows_, [&path](const auto& existing) {
                 std::error_code comparison_error;
-                return std::filesystem::equivalent(existing.input_path, path,
+                return !existing.IsTerminal() &&
+                       std::filesystem::equivalent(existing.input_path, path,
                                                    comparison_error) &&
                        !comparison_error;
             });
         if (!duplicate) {
             QueueRow row;
             row.input_path = path;
+            row.input_format = ReadFormat(path);
+            row.kind = KindForFormat(row.input_format);
+            if (row.kind == ConversionKind::Unknown) {
+                row.state = L"unsupported";
+                row.message =
+                    L"NativeShift could not identify a supported file type.";
+            }
             rows_.push_back(std::move(row));
         }
     }
 }
 
-void QueueViewModel::Start(const std::filesystem::path& output_folder,
-                           const std::wstring_view output_format,
-                           const std::wstring_view options_json) {
+std::size_t QueueViewModel::Start(const ConversionKind kind,
+                                  const std::filesystem::path& output_folder,
+                                  const std::wstring_view output_format,
+                                  const std::wstring_view options_json) {
+    std::size_t submitted{};
     for (auto& row : rows_) {
-        if (row.id != 0 || row.state != L"Ready") {
+        if (row.kind != kind || row.id != 0 || row.state != L"ready") {
             continue;
         }
         const auto directory = output_folder.empty()
@@ -156,8 +220,10 @@ void QueueViewModel::Start(const std::filesystem::path& output_folder,
             row.message = LastError();
         } else {
             row.state = L"pending";
+            ++submitted;
         }
     }
+    return submitted;
 }
 
 void QueueViewModel::Refresh() {
@@ -175,6 +241,7 @@ void QueueViewModel::Refresh() {
             row.stage = JsonString(object, L"stage", row.stage);
             row.input_format =
                 JsonString(object, L"input_format", row.input_format);
+            row.kind = KindForFormat(row.input_format);
             row.output_format =
                 JsonString(object, L"output_format", row.output_format);
             row.progress = object.GetNamedNumber(L"progress", row.progress);
@@ -258,14 +325,22 @@ void QueueViewModel::ClearCompleted() {
     });
 }
 
+void QueueViewModel::ClearStaged() {
+    std::erase_if(rows_, [](const auto& row) { return row.id == 0; });
+}
+
 std::vector<std::size_t>
 QueueViewModel::FilteredIndices(const std::wstring_view filter,
-                                const std::wstring_view state_filter) const {
+                                const std::wstring_view state_filter,
+                                const ConversionKind kind_filter) const {
     const auto normalized_filter = Lowercase(std::wstring(filter));
     const auto normalized_state = Lowercase(std::wstring(state_filter));
     std::vector<std::size_t> result;
     for (std::size_t index = 0; index < rows_.size(); ++index) {
         const auto& row = rows_[index];
+        if (kind_filter != ConversionKind::All && row.kind != kind_filter) {
+            continue;
+        }
         const auto matches_text =
             normalized_filter.empty() ||
             Lowercase(row.input_path.filename().native())

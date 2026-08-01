@@ -1,5 +1,8 @@
 #include "nativeshift/gui_bridge.h"
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -20,6 +23,33 @@ TEST(GuiBridge, ReportsCapabilitiesAndPresetsAsJson) {
     const auto presets = Read(nativeshift_presets_json);
     EXPECT_NE(capabilities.find(L"ffmpeg_version"), std::wstring::npos);
     EXPECT_NE(presets.find(L"jpeg-high"), std::wstring::npos);
+}
+
+TEST(GuiBridge, DetectsFormatByContentForImmediateQueueFeedback) {
+    const auto suffix =
+        std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto path =
+        std::filesystem::temp_directory_path() /
+        ("nativeshift-gui-detect-" + std::to_string(suffix) + ".txt");
+    {
+        std::ofstream output(path, std::ios::binary);
+        constexpr unsigned char png_signature[]{0x89, 0x50, 0x4E, 0x47,
+                                                0x0D, 0x0A, 0x1A, 0x0A};
+        for (const auto byte : png_signature) {
+            output.put(static_cast<char>(byte));
+        }
+    }
+
+    const auto required = nativeshift_detect_format(path.c_str(), nullptr, 0);
+    ASSERT_GT(required, 1U);
+    std::vector<wchar_t> buffer(required);
+    EXPECT_EQ(
+        nativeshift_detect_format(path.c_str(), buffer.data(), buffer.size()),
+        required);
+    EXPECT_EQ(std::wstring(buffer.data()), L"png");
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
 }
 
 TEST(GuiBridge, ReportsSettingsLogsAndPrivacySafeDiagnostics) {
