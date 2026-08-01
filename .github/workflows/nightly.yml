@@ -44,7 +44,7 @@ jobs:
           . ./scripts/initialize-build-environment.ps1
           Initialize-NativeBuildEnvironment
           cmake --preset release
-          cmake --build --preset release
+          cmake --build --preset release --parallel 4
           $benchmarkJson = & ./out/build/nativeshift-release/benchmarks/NativeShift.Benchmarks.exe --include-media
           if ($LASTEXITCODE -ne 0) {
             throw "NativeShift.Benchmarks exited with code $LASTEXITCODE."
