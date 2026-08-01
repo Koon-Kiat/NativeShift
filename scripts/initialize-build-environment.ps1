@@ -6,6 +6,29 @@ function Initialize-NativeBuildEnvironment {
         [string]$Architecture = 'x64'
     )
 
+    function Set-NativeProcessPath {
+        param([Parameter(Mandatory)][string]$Value)
+
+        [Environment]::SetEnvironmentVariable(
+            'PATH', $null, [EnvironmentVariableTarget]::Process)
+        [Environment]::SetEnvironmentVariable(
+            'Path', $null, [EnvironmentVariableTarget]::Process)
+        [Environment]::SetEnvironmentVariable(
+            'Path', $Value, [EnvironmentVariableTarget]::Process)
+    }
+
+    function Add-NativeProcessPath {
+        param([Parameter(Mandatory)][string]$Directory)
+
+        $current = [Environment]::GetEnvironmentVariable(
+            'Path', [EnvironmentVariableTarget]::Process)
+        Set-NativeProcessPath -Value "$Directory;$current"
+    }
+
+    $initialPath = [Environment]::GetEnvironmentVariable(
+        'Path', [EnvironmentVariableTarget]::Process)
+    Set-NativeProcessPath -Value $initialPath
+
     $installation = $null
     if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
         $vswhere = Join-Path ${env:ProgramFiles(x86)} `
@@ -33,7 +56,11 @@ function Initialize-NativeBuildEnvironment {
             }
             $name = $line.Substring(0, $separator)
             $value = $line.Substring($separator + 1)
-            Set-Item -Path "Env:$name" -Value $value
+            if ($name -ieq 'Path') {
+                Set-NativeProcessPath -Value $value
+            } else {
+                Set-Item -Path "Env:$name" -Value $value
+            }
         }
     }
 
@@ -54,6 +81,21 @@ function Initialize-NativeBuildEnvironment {
             -not (Test-Path -LiteralPath $bundledCMake)) {
             throw 'cmake.exe was not found.'
         }
-        $env:PATH = "$(Split-Path -Parent $bundledCMake);$env:PATH"
+        Add-NativeProcessPath -Directory (Split-Path -Parent $bundledCMake)
+    }
+
+    if (-not (Get-Command dumpbin.exe -ErrorAction SilentlyContinue)) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} `
+            'Microsoft Visual Studio\Installer\vswhere.exe'
+        if (-not (Test-Path -LiteralPath $vswhere)) {
+            throw 'vswhere.exe was not found while locating dumpbin.exe.'
+        }
+        $dumpbin = & $vswhere -latest -products * `
+            -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' |
+            Select-Object -First 1
+        if (-not $dumpbin) {
+            throw 'dumpbin.exe was not found in the active Visual Studio installation.'
+        }
+        Add-NativeProcessPath -Directory (Split-Path -Parent $dumpbin)
     }
 }

@@ -9,7 +9,11 @@ accounts, advertisements, telemetry, or shell-built codec commands.
 > Production MSIX signing and hardware-specific validation require the release
 > environment described below.
 
-![NativeShift logo](src/NativeShift.App/Assets/NativeShiftLogoMaster.png)
+<p align="center">
+  <img src="src/NativeShift.App/Assets/NativeShiftLogoMaster.png"
+       alt="NativeShift logo"
+       width="160">
+</p>
 
 ## Supported conversion
 
@@ -103,7 +107,7 @@ so dependencies must remain patched and release security gates must pass.
 - [Security controls](docs/security.md)
 - [Threat model](docs/threat-model.md)
 - [Performance](docs/performance.md)
-- [Licensing and codecs](docs/licensing.md)
+- [Codec licensing obligations](docs/codec-obligations.md)
 - [Release process](docs/releasing.md)
 
 NativeShift is MIT licensed. Third-party and codec terms remain independent;

@@ -153,6 +153,7 @@ foreach ($required in @($cliExecutable, $bridgeDll, $vcpkgInstalled)) {
 $msbuild = Find-MSBuild
 $msixOutput = Join-Path $stagingRoot 'msix\'
 $portableOutput = Join-Path $stagingRoot 'portable-app\'
+$portableIntermediate = Join-Path $stagingRoot 'portable-obj\'
 $runtimeDlls = Get-VcpkgRuntimeDependencies `
     -Binaries @($cliExecutable, $bridgeDll) `
     -RuntimeDirectory (Join-Path $vcpkgInstalled 'bin')
@@ -186,6 +187,7 @@ if (-not $SkipAppBuild) {
         '/p:AppxPackage=false',
         '/p:WindowsAppSDKSelfContained=true',
         '/p:WholeProgramOptimization=false',
+        "/p:IntDir=$portableIntermediate",
         "/p:OutDir=$portableOutput"
     )
 }
@@ -233,6 +235,8 @@ Invoke-Checked -Program $makeAppx -Arguments @(
 )
 Copy-Item -Path (Join-Path $licenseStage '*') `
     -Destination $expandedMsix -Recurse -Force
+Copy-Item -LiteralPath $bridgeDll -Destination $expandedMsix -Force
+$runtimeDlls | Copy-Item -Destination $expandedMsix -Force
 Remove-Item -LiteralPath $msixPath -Force
 Invoke-Checked -Program $makeAppx -Arguments @(
     'pack', '/d', $expandedMsix, '/p', $msixPath, '/o'
@@ -288,7 +292,7 @@ New-Zip -Source $symbolsStage -Destination (
     Join-Path $distributionRoot "NativeShift-Symbols-$Version-windows-$Architecture.zip"
 )
 
-$vcpkgStatus = Join-Path $vcpkgInstalled 'vcpkg\status'
+$vcpkgStatus = Join-Path (Split-Path -Parent $vcpkgInstalled) 'vcpkg\status'
 $packages = @()
 if (Test-Path -LiteralPath $vcpkgStatus) {
     $paragraphs = (Get-Content -LiteralPath $vcpkgStatus -Raw) -split "(?:\r?\n){2,}"
@@ -296,10 +300,15 @@ if (Test-Path -LiteralPath $vcpkgStatus) {
         $name = [regex]::Match($paragraph, '(?m)^Package:\s*(.+)$')
         $resolvedVersion = [regex]::Match($paragraph, '(?m)^Version:\s*(.+)$')
         if ($name.Success -and $resolvedVersion.Success) {
+            $portVersion = [regex]::Match($paragraph, '(?m)^Port-Version:\s*(\d+)$')
+            $versionInfo = $resolvedVersion.Groups[1].Value
+            if ($portVersion.Success -and $portVersion.Groups[1].Value -ne '0') {
+                $versionInfo += "#$($portVersion.Groups[1].Value)"
+            }
             $packages += [ordered]@{
                 SPDXID = "SPDXRef-Package-vcpkg-$($name.Groups[1].Value -replace '[^A-Za-z0-9.-]', '-')"
                 name = $name.Groups[1].Value
-                versionInfo = $resolvedVersion.Groups[1].Value
+                versionInfo = $versionInfo
                 downloadLocation = 'NOASSERTION'
                 filesAnalyzed = $false
                 licenseConcluded = 'NOASSERTION'

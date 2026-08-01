@@ -80,10 +80,13 @@ FilePointer OpenFile(const std::filesystem::path& path,
     (void)portable_mode;
     std::FILE* raw = nullptr;
     const auto extended = ExtendedPath(path);
-    if (_wfopen_s(&raw, extended.c_str(), windows_mode) != 0) {
-        raw = nullptr;
+    const auto open_error = _wfopen_s(&raw, extended.c_str(), windows_mode);
+    // cppcheck-suppress mismatchAllocDealloc
+    FilePointer file(raw);
+    if (open_error != 0) {
+        return FilePointer(nullptr);
     }
-    return FilePointer(raw);
+    return file;
 #else
     (void)windows_mode;
     return FilePointer(std::fopen(path.string().c_str(), portable_mode));

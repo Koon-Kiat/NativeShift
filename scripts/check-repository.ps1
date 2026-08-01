@@ -24,6 +24,9 @@ try {
 
     foreach ($relative in $tracked) {
         $path = Join-Path $repositoryRoot $relative
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
         if ((Get-Item -LiteralPath $path).Length -gt 10MB) {
             throw "Tracked file exceeds 10 MiB: $relative"
         }

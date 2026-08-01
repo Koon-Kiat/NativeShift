@@ -1,4 +1,4 @@
-# Licensing and codecs
+# Codec licensing obligations
 
 NativeShift application source is MIT licensed. That does not change the
 licenses, patent exposure, or redistribution obligations of its dependencies.

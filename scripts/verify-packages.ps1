@@ -87,6 +87,16 @@ if ($LASTEXITCODE -ne 0) {
     throw 'The MSIX could not be unpacked.'
 }
 
+[xml]$appxManifest = Get-Content -LiteralPath (Join-Path $msixRoot 'AppxManifest.xml') -Raw
+$identity = $appxManifest.Package.Identity
+$semanticVersion = ($Version -split '-', 2)[0]
+if ($identity.ProcessorArchitecture -ne $Architecture) {
+    throw "MSIX architecture is $($identity.ProcessorArchitecture), expected $Architecture."
+}
+if ($identity.Version -notlike "$semanticVersion.*") {
+    throw "MSIX version is $($identity.Version), expected $semanticVersion.x."
+}
+
 $payloadRoots = Get-ChildItem -LiteralPath $verificationRoot -Directory |
     Where-Object Name -notmatch 'Symbols'
 foreach ($root in $payloadRoots) {
@@ -115,6 +125,7 @@ foreach ($required in @(
     (Join-Path $portable 'MainWindow.xbf'),
     (Join-Path $cli 'nativeshift-cli.exe'),
     (Join-Path $msixRoot 'NativeShift.exe'),
+    (Join-Path $msixRoot 'NativeShift.GuiBridge.dll'),
     (Join-Path $msixRoot 'AppxManifest.xml')
 )) {
     if (-not (Test-Path -LiteralPath $required)) {
@@ -150,6 +161,22 @@ foreach ($jsonName in @(
         ConvertFrom-Json
     if (-not $document) {
         throw "JSON document is empty: $jsonName"
+    }
+}
+
+$sbom = Get-Content -LiteralPath (
+    Join-Path $packageRoot "NativeShift-$Version-sbom.spdx.json"
+) -Raw | ConvertFrom-Json
+$sbomPackages = @($sbom.packages | ForEach-Object name)
+foreach ($requiredPackage in @(
+    'NativeShift',
+    'ffmpeg',
+    'libpng',
+    'libwebp',
+    'Microsoft.WindowsAppSDK'
+)) {
+    if ($requiredPackage -notin $sbomPackages) {
+        throw "SBOM is missing required package: $requiredPackage"
     }
 }
 

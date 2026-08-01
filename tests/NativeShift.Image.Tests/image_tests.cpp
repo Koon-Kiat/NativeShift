@@ -73,6 +73,7 @@ bool CreateTinyPng(const std::filesystem::path& path) {
 #else
     raw = std::fopen(path.string().c_str(), "wb");
 #endif
+    // cppcheck-suppress mismatchAllocDealloc
     std::unique_ptr<std::FILE, FileCloser> file(raw);
     if (!file) {
         return false;

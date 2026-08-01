@@ -25,4 +25,4 @@ runtime. Hardware-only behavior must retain a mandatory software fallback.
 Report security issues privately as described in [SECURITY.md](SECURITY.md).
 Contributions are accepted under the repository's MIT license; dependencies
 and codec changes must also update `THIRD_PARTY_NOTICES.md` and
-`docs/licensing.md`.
+`docs/codec-obligations.md`.
