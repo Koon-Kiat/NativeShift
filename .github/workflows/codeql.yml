@@ -40,17 +40,17 @@ jobs:
           path: out/vcpkg-cache
           key: vcpkg-${{ runner.os }}-x64-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-${{ runner.os }}-x64-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
-        with:
-          languages: c-cpp
-          queries: security-extended
       - name: Configure clean Release build
         shell: pwsh
         run: |
           . ./scripts/initialize-build-environment.ps1
           Initialize-NativeBuildEnvironment
           cmake --preset release
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          languages: c-cpp
+          queries: security-extended
       - name: Compile observed C++
         shell: pwsh
         run: |
