@@ -1,14 +1,16 @@
 # Performance
 
-NativeShift includes `nativeshift-benchmark`; it creates tiny legal inputs in a
+NativeShift includes `NativeShift.Benchmarks`; it creates tiny legal inputs in a
 temporary directory and emits JSON.
 
 ```powershell
-.\out\build\nativeshift-release\benchmarks\nativeshift-benchmark.exe `
-  --output .\out\benchmarks\core.json
+New-Item -ItemType Directory -Force .\out\benchmarks | Out-Null
+.\out\build\nativeshift-release\benchmarks\NativeShift.Benchmarks.exe |
+  Set-Content .\out\benchmarks\core.json -Encoding utf8
 
-.\out\build\nativeshift-release\benchmarks\nativeshift-benchmark.exe `
-  --include-media --output .\out\benchmarks\media.json
+.\out\build\nativeshift-release\benchmarks\NativeShift.Benchmarks.exe `
+  --include-media |
+  Set-Content .\out\benchmarks\media.json -Encoding utf8
 ```
 
 The core run measures signature detection, output naming, BMP-to-PNG encoding,
@@ -27,3 +29,4 @@ The decoded image ceiling is 100 million pixels. Do not raise resource limits,
 worker count, or codec thread counts based on a single benchmark. Measure peak
 memory and batch tail latency as well as throughput, and never trade output
 integrity or validation for speed.
+

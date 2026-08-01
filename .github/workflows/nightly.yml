@@ -44,7 +44,12 @@ jobs:
           Initialize-NativeBuildEnvironment
           cmake --preset release
           cmake --build --preset release
-          ./out/build/nativeshift-release/benchmarks/nativeshift-benchmark.exe --output ./out/nightly-benchmark.json
+          $benchmarkJson = & ./out/build/nativeshift-release/benchmarks/NativeShift.Benchmarks.exe --include-media
+          if ($LASTEXITCODE -ne 0) {
+            throw "NativeShift.Benchmarks exited with code $LASTEXITCODE."
+          }
+          $benchmarkJson | Out-String | ConvertFrom-Json | Out-Null
+          $benchmarkJson | Set-Content ./out/nightly-benchmark.json -Encoding utf8
       - name: Upload analysis evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -55,3 +60,4 @@ jobs:
             out/nightly-benchmark.json
           if-no-files-found: warn
           retention-days: 14
+
