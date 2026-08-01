@@ -7,12 +7,14 @@
 #include "nativeshift/core/settings.hpp"
 #include "nativeshift/core/validation.hpp"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <stop_token>
 #include <string>
 #include <thread>
@@ -177,6 +179,16 @@ TEST(FormatDetection, DetectsContentInsteadOfExtension) {
     EXPECT_EQ(nativeshift::core::DetectFormat(png).format, FileFormat::Png);
     EXPECT_EQ(nativeshift::core::DetectFormat(jpeg).format, FileFormat::Jpeg);
     EXPECT_EQ(nativeshift::core::DetectFormat(webp).format, FileFormat::WebP);
+}
+
+TEST(FormatDetection, DetectsInMemoryContentForFuzzing) {
+    constexpr std::array<std::uint8_t, 12> webp{'R', 'I', 'F', 'F', 0,   0,
+                                                0,   0,   'W', 'E', 'B', 'P'};
+
+    EXPECT_EQ(nativeshift::core::DetectFormat(webp).format, FileFormat::WebP);
+    EXPECT_EQ(
+        nativeshift::core::DetectFormat(std::span<const std::uint8_t>{}).format,
+        FileFormat::Unknown);
 }
 
 TEST(FormatDetection, RejectsUnknownContent) {

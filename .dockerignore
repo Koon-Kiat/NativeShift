@@ -1,0 +1,8 @@
+.git
+.vs
+out
+vcpkg_installed
+src/NativeShift.App/Generated Files
+src/NativeShift.App/NativeShift.App
+src/NativeShift.App/obj
+src/NativeShift.App/x64

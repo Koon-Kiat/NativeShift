@@ -6,10 +6,11 @@ Security fixes are provided for the latest released NativeShift version.
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting feature for
-`Koon-Kiat/NativeShift`. Do not open a public issue containing exploit details,
-private filenames, credentials, or malicious samples. Include the affected
-version, reproduction steps, impact, and the smallest safe proof of concept.
+Report vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/Koon-Kiat/NativeShift/security/advisories/new).
+Do not open a public issue containing exploit details, private filenames,
+credentials, or malicious samples. Include the affected version, reproduction
+steps, impact, and the smallest safe proof of concept.
 
 Acknowledgement is targeted within seven days. Timing of a fix and disclosure
 depends on severity and dependency coordination. Never upload confidential
