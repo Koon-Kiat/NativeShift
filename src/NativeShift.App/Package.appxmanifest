@@ -8,7 +8,7 @@
   <Identity
     Name="KoonKiat.NativeShift"
     Publisher="CN=NativeShift Development"
-    Version="0.1.0.0" />
+    Version="0.2.0.0" />
   <mp:PhoneIdentity PhoneProductId="7d24975f-9862-451d-82f5-aed63da4b51c" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
   <Properties>
     <DisplayName>NativeShift</DisplayName>

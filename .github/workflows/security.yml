@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+  schedule:
+    - cron: '11 19 * * 3'
   workflow_dispatch:
 
 permissions:
@@ -35,7 +37,7 @@ jobs:
 
   scorecard:
     name: OpenSSF Scorecard
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -63,6 +65,7 @@ jobs:
 
   asan:
     name: AddressSanitizer
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-2025
     timeout-minutes: 120
     env:

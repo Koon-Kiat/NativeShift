@@ -343,6 +343,14 @@ class BridgeService {
         return Utf8ToWide(document.dump());
     }
 
+    std::wstring Detect(const wchar_t* input_path) const {
+        if (input_path == nullptr || *input_path == L'\0') {
+            return L"unknown";
+        }
+        return Utf8ToWide(nativeshift::core::ToString(
+            nativeshift::core::DetectFormat(input_path).format));
+    }
+
     std::wstring Capabilities() const {
         const auto& detected = nativeshift::media::DetectMediaCapabilities();
         nlohmann::json document{
@@ -447,6 +455,26 @@ class BridgeService {
             settings.maximum_concurrent_conversions =
                 document.value("maximum_concurrent_conversions",
                                settings.maximum_concurrent_conversions);
+            const auto hardware =
+                document.value("hardware_acceleration", std::string{"auto"});
+            settings.hardware_acceleration =
+                hardware == "prefer_hardware"
+                    ? nativeshift::core::HardwareAccelerationPreference::
+                          PreferHardware
+                : hardware == "disabled"
+                    ? nativeshift::core::HardwareAccelerationPreference::
+                          Disabled
+                    : nativeshift::core::HardwareAccelerationPreference::Auto;
+            settings.preserve_metadata =
+                document.value("preserve_metadata", settings.preserve_metadata);
+            if (const auto policy =
+                    nativeshift::core::OutputConflictPolicyFromString(
+                        document.value("existing_file_policy",
+                                       std::string(nativeshift::core::ToString(
+                                           settings.existing_file_policy))));
+                policy.has_value()) {
+                settings.existing_file_policy = *policy;
+            }
             const auto theme = document.value("theme", std::string{"system"});
             settings.theme =
                 theme == "light"  ? nativeshift::core::ThemePreference::Light
@@ -570,6 +598,13 @@ std::size_t nativeshift_queue_json(wchar_t* destination,
                                    const std::size_t destination_size) {
     return WriteJson([] { return Service().Queue(); }, destination,
                      destination_size);
+}
+
+std::size_t nativeshift_detect_format(const wchar_t* input_path,
+                                      wchar_t* destination,
+                                      const std::size_t destination_size) {
+    return WriteJson([input_path] { return Service().Detect(input_path); },
+                     destination, destination_size);
 }
 
 std::size_t nativeshift_capabilities_json(wchar_t* destination,

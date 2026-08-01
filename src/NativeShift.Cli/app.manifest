@@ -4,7 +4,7 @@
       name="NativeShift.Cli"
       processorArchitecture="amd64"
       type="win32"
-      version="0.1.0.0" />
+      version="0.2.0.0" />
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

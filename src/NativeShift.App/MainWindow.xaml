@@ -6,274 +6,319 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="NativeShift">
-    <Window.SystemBackdrop>
-        <MicaBackdrop Kind="BaseAlt" />
-    </Window.SystemBackdrop>
-    <Grid>
+    <Grid x:Name="RootLayout" Background="#212121" RequestedTheme="Dark" AllowDrop="True" DragOver="DropArea_DragOver" Drop="DropArea_Drop">
         <Grid.Resources>
-            <SolidColorBrush x:Key="NativeShiftTealBrush" Color="#14B8A6" />
-            <SolidColorBrush x:Key="NativeShiftAmberBrush" Color="#F59E0B" />
+            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#212121" />
+            <SolidColorBrush x:Key="ChromeBrush" Color="#212121" />
+            <SolidColorBrush x:Key="SidebarBrush" Color="#171717" />
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#2F2F2F" />
+            <SolidColorBrush x:Key="InputBrush" Color="#303030" />
+            <SolidColorBrush x:Key="BorderBrush" Color="#343434" />
+            <SolidColorBrush x:Key="SidebarSelectedBrush" Color="#2A2A2A" />
+            <SolidColorBrush x:Key="TransparentBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F4F4F4" />
+            <SolidColorBrush x:Key="DarkTextBrush" Color="#111111" />
+            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#AFAFAF" />
+
+            <Style x:Key="ChromeButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="5" />
+                <Setter Property="Width" Value="30" />
+                <Setter Property="Height" Value="30" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="UseSystemFocusVisuals" Value="False" />
+            </Style>
+            <Style x:Key="MenuButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#B4B4B4" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Height" Value="28" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Padding" Value="9,3" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="UseSystemFocusVisuals" Value="False" />
+            </Style>
+            <Style x:Key="DetectedTypeButtonStyle" TargetType="Button">
+                <Setter Property="Height" Value="34" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Padding" Value="11,5" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+            <Storyboard x:Key="SidebarOpenAnimation">
+                <DoubleAnimation Storyboard.TargetName="SidebarIconTransform" Storyboard.TargetProperty="Angle" To="0" Duration="0:0:0.18" EnableDependentAnimation="True" />
+            </Storyboard>
+            <Storyboard x:Key="SidebarCloseAnimation">
+                <DoubleAnimation Storyboard.TargetName="SidebarIconTransform" Storyboard.TargetProperty="Angle" To="180" Duration="0:0:0.18" EnableDependentAnimation="True" />
+            </Storyboard>
+            <Style x:Key="SidebarButtonStyle" TargetType="Button">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="7" />
+                <Setter Property="MinHeight" Value="38" />
+                <Setter Property="Padding" Value="10,7" />
+                <Setter Property="Margin" Value="6,1" />
+            </Style>
+            <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="#F4F4F4" />
+                <Setter Property="Foreground" Value="#111111" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="9" />
+                <Setter Property="Padding" Value="16,9" />
+            </Style>
+            <Style x:Key="SettingsCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="18" />
+            </Style>
+            <Style x:Key="QueueItemStyle" TargetType="ListViewItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Background" Value="#292929" />
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="9" />
+                <Setter Property="Padding" Value="14,11" />
+                <Setter Property="Margin" Value="0,0,0,7" />
+                <Setter Property="MinHeight" Value="66" />
+            </Style>
+            <Style x:Key="SidebarJobItemStyle" TargetType="ListViewItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="8,6" />
+                <Setter Property="Margin" Value="0,1" />
+                <Setter Property="MinHeight" Value="32" />
+            </Style>
+            <Style x:Key="SidebarJobActionButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="26" />
+                <Setter Property="Height" Value="26" />
+                <Setter Property="MinWidth" Value="26" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="5" />
+                <Setter Property="UseSystemFocusVisuals" Value="False" />
+            </Style>
         </Grid.Resources>
-        <NavigationView
-            x:Name="Navigation"
-            PaneDisplayMode="LeftCompact"
-            IsBackButtonVisible="Collapsed"
-            IsSettingsVisible="False"
-            SelectionChanged="Navigation_SelectionChanged"
-            AutomationProperties.Name="Application pages">
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="Convert" Icon="Switch" Tag="convert" />
-                <NavigationViewItem Content="Settings" Icon="Setting" Tag="settings" />
-                <NavigationViewItem Content="Capabilities" Icon="AllApps" Tag="capabilities" />
-                <NavigationViewItem Content="About" Icon="Help" Tag="about" />
-            </NavigationView.MenuItems>
-            <Grid Margin="24,16,24,24">
-                <Grid x:Name="ConvertPage">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Spacing="4">
-                        <TextBlock Text="NativeShift" FontSize="30" FontWeight="SemiBold" />
-                        <TextBlock
-                            Text="Private, local conversion for images, audio, and video."
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-                    <Border
-                        x:Name="DropArea"
-                        Grid.Row="1"
-                        Margin="0,16,0,12"
-                        Padding="24"
-                        MinHeight="108"
-                        BorderBrush="{StaticResource NativeShiftTealBrush}"
-                        BorderThickness="2"
-                        CornerRadius="12"
-                        AllowDrop="True"
-                        DragOver="DropArea_DragOver"
-                        Drop="DropArea_Drop"
-                        AutomationProperties.Name="Drop files or folders for conversion">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                            <FontIcon Glyph="&#xE8B7;" FontSize="28" />
-                            <TextBlock Text="Drop files or folders here" FontSize="18" FontWeight="SemiBold" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                                <Button Content="Add Files" AccessKey="F" Click="AddFiles_Click" />
-                                <Button Content="Add Folder" AccessKey="D" Click="AddFolder_Click" />
-                                <CheckBox x:Name="RecursiveFolders" Content="Include subfolders" IsChecked="True" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <Grid Grid.Row="2" ColumnSpacing="8" Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="180" />
-                            <ColumnDefinition Width="180" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="SearchBox"
-                            PlaceholderText="Search queue"
-                            Header="Queue filter"
-                            TextChanged="SearchBox_TextChanged"
-                            AutomationProperties.Name="Search conversion queue" />
-                        <ComboBox
-                            x:Name="StateFilter"
-                            Grid.Column="1"
-                            Header="Status"
-                            SelectedIndex="0">
-                            <ComboBoxItem Content="All" />
-                            <ComboBoxItem Content="pending" />
-                            <ComboBoxItem Content="converting" />
-                            <ComboBoxItem Content="completed" />
-                            <ComboBoxItem Content="completed_with_warnings" />
-                            <ComboBoxItem Content="failed" />
-                            <ComboBoxItem Content="cancelled" />
-                        </ComboBox>
-                        <ComboBox
-                            x:Name="OutputFormat"
-                            Grid.Column="2"
-                            Header="Output format"
-                            SelectedIndex="0"
-                            AutomationProperties.Name="Output format">
-                            <ComboBoxItem Content="png" />
-                            <ComboBoxItem Content="jpeg" />
-                            <ComboBoxItem Content="webp" />
-                            <ComboBoxItem Content="bmp" />
-                            <ComboBoxItem Content="tiff" />
-                            <ComboBoxItem Content="mp3" />
-                            <ComboBoxItem Content="wav" />
-                            <ComboBoxItem Content="flac" />
-                            <ComboBoxItem Content="aac" />
-                            <ComboBoxItem Content="m4a" />
-                            <ComboBoxItem Content="ogg" />
-                            <ComboBoxItem Content="opus" />
-                            <ComboBoxItem Content="mp4" />
-                            <ComboBoxItem Content="mkv" />
-                            <ComboBoxItem Content="webm" />
-                        </ComboBox>
-                    </Grid>
-
-                    <Grid Grid.Row="3" ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="*" MinWidth="280" />
-                        </Grid.ColumnDefinitions>
-                        <ListView
-                            x:Name="QueueList"
-                            SelectionMode="Single"
-                            SelectionChanged="QueueList_SelectionChanged"
-                            AutomationProperties.Name="Conversion queue">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="MinHeight" Value="48" />
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                        </ListView>
-                        <ScrollViewer Grid.Column="1">
-                            <StackPanel Spacing="10">
-                                <TextBlock Text="Job details" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock
-                                    x:Name="DetailsText"
-                                    Text="Select a queue item to inspect progress, output path, codec, warnings, or errors."
-                                    TextWrapping="Wrap"
-                                    IsTextSelectionEnabled="True"
-                                    AutomationProperties.Name="Selected job details" />
-                                <Expander Header="Conversion settings" IsExpanded="True">
-                                    <StackPanel Padding="0,8,0,0" Spacing="8">
-                                        <ComboBox x:Name="PresetSelector" Header="Preset" SelectedIndex="0">
-                                            <ComboBoxItem Content="Custom" />
-                                            <ComboBoxItem Content="JPEG high quality" Tag="jpeg-high" />
-                                            <ComboBoxItem Content="WebP balanced" Tag="webp-balanced" />
-                                            <ComboBoxItem Content="MP3 high quality" Tag="mp3-high" />
-                                            <ComboBoxItem Content="Opus voice" Tag="opus-voice" />
-                                            <ComboBoxItem Content="MP4 H.264 compatibility" Tag="mp4-h264" />
-                                            <ComboBoxItem Content="WebM VP9" Tag="webm-vp9" />
-                                        </ComboBox>
-                                        <NumberBox x:Name="Quality" Header="Quality" Value="85" Minimum="1" Maximum="100" />
-                                        <ComboBox x:Name="AudioCodec" Header="Audio codec" SelectedIndex="0">
-                                            <ComboBoxItem Content="Automatic" Tag="automatic" />
-                                            <ComboBoxItem Content="MP3" Tag="mp3" />
-                                            <ComboBoxItem Content="PCM 16-bit" Tag="pcm" />
-                                            <ComboBoxItem Content="FLAC" Tag="flac" />
-                                            <ComboBoxItem Content="AAC" Tag="aac" />
-                                            <ComboBoxItem Content="Vorbis" Tag="vorbis" />
-                                            <ComboBoxItem Content="Opus" Tag="opus" />
-                                            <ComboBoxItem Content="Stream copy" Tag="copy" />
-                                        </ComboBox>
-                                        <NumberBox x:Name="AudioBitrate" Header="Audio bitrate (kbps)" Value="192" Minimum="8" Maximum="1536" />
-                                        <ComboBox x:Name="VideoCodec" Header="Video codec" SelectedIndex="0">
-                                            <ComboBoxItem Content="Automatic" Tag="automatic" />
-                                            <ComboBoxItem Content="H.264" Tag="h264" />
-                                            <ComboBoxItem Content="H.265 / HEVC" Tag="h265" />
-                                            <ComboBoxItem Content="VP9" Tag="vp9" />
-                                            <ComboBoxItem Content="AV1" Tag="av1" />
-                                            <ComboBoxItem Content="Stream copy" Tag="copy" />
-                                        </ComboBox>
-                                        <NumberBox x:Name="VideoQuality" Header="Video quality (codec scale)" Value="23" Minimum="0" Maximum="63" />
-                                        <NumberBox x:Name="Width" Header="Width (optional)" Minimum="1" SpinButtonPlacementMode="Compact" />
-                                        <NumberBox x:Name="Height" Header="Height (optional)" Minimum="1" SpinButtonPlacementMode="Compact" />
-                                        <ComboBox x:Name="HardwareMode" Header="Hardware acceleration" SelectedIndex="0">
-                                            <ComboBoxItem Content="Automatic" Tag="auto" />
-                                            <ComboBoxItem Content="Prefer hardware" Tag="prefer" />
-                                            <ComboBoxItem Content="Software only" Tag="software" />
-                                        </ComboBox>
-                                        <CheckBox x:Name="PreserveMetadata" Content="Preserve metadata where supported" />
-                                        <ComboBox x:Name="ConflictPolicy" Header="Existing output" SelectedIndex="3">
-                                            <ComboBoxItem Content="Ask" Tag="ask" />
-                                            <ComboBoxItem Content="Skip" Tag="skip" />
-                                            <ComboBoxItem Content="Replace" Tag="replace" />
-                                            <ComboBoxItem Content="Generate unique name" Tag="unique" />
-                                        </ComboBox>
-                                    </StackPanel>
-                                </Expander>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Grid>
-
-                    <StackPanel Grid.Row="4" Margin="0,12,0,0" Spacing="8">
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="OutputFolder" Header="Output folder (blank uses the source folder)" IsReadOnly="True" />
-                            <Button Grid.Column="1" VerticalAlignment="Bottom" Content="Browse" Click="BrowseOutput_Click" />
-                        </Grid>
-                        <ProgressBar x:Name="OverallProgress" Minimum="0" Maximum="100" AutomationProperties.Name="Overall conversion progress" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button
-                                Content="Convert"
-                                AccessKey="C"
-                                Background="{StaticResource NativeShiftAmberBrush}"
-                                Foreground="Black"
-                                Click="Convert_Click" />
-                            <Button Content="Pause Queue" Click="Pause_Click" />
-                            <Button Content="Resume Queue" Click="Resume_Click" />
-                            <Button Content="Cancel Selected" Click="CancelSelected_Click" />
-                            <Button Content="Cancel All" Click="CancelAll_Click" />
-                            <Button Content="Retry Selected" Click="RetrySelected_Click" />
-                            <Button Content="Remove Selected" Click="RemoveSelected_Click" />
-                            <Button Content="Clear Completed" Click="ClearCompleted_Click" />
-                            <Button Content="Open Output Folder" Click="OpenOutput_Click" />
-                        </StackPanel>
-                    </StackPanel>
-                </Grid>
-
-                <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed">
-                    <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="12">
-                        <TextBlock Text="Application settings" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Settings are stored per user under LocalAppData\NativeShift and contain no file contents." TextWrapping="Wrap" />
-                        <ComboBox x:Name="ThemeSetting" Header="Theme" SelectedIndex="0">
-                            <ComboBoxItem Content="Use system setting" Tag="system" />
-                            <ComboBoxItem Content="Light" Tag="light" />
-                            <ComboBoxItem Content="Dark" Tag="dark" />
-                        </ComboBox>
-                        <NumberBox x:Name="MaximumJobsSetting" Header="Maximum concurrent conversions (takes effect after restart)" Minimum="1" Maximum="32" Value="2" />
-                        <ComboBox x:Name="LoggingSetting" Header="Logging level" SelectedIndex="1">
-                            <ComboBoxItem Content="Debug (may include full paths)" Tag="debug" />
-                            <ComboBoxItem Content="Information" Tag="information" />
-                            <ComboBoxItem Content="Warning" Tag="warning" />
-                            <ComboBoxItem Content="Error" Tag="error" />
-                        </ComboBox>
-                        <ToggleSwitch x:Name="NotificationsSetting" Header="Completion notifications" IsOn="True" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="Save settings" Click="SaveSettings_Click" />
-                            <Button Content="Reset settings to defaults" Click="ResetSettings_Click" />
-                            <Button Content="Open logs folder" Click="OpenLogs_Click" />
-                            <Button Content="Copy diagnostic summary" Click="CopyDiagnostics_Click" />
-                        </StackPanel>
-                        <TextBlock x:Name="SettingsStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-                    </StackPanel>
-                </ScrollViewer>
-
-                <ScrollViewer x:Name="CapabilitiesPage" Visibility="Collapsed">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Supported formats and capabilities" FontSize="28" FontWeight="SemiBold" />
-                        <Button Content="Refresh capabilities" Click="RefreshCapabilities_Click" HorizontalAlignment="Left" />
-                        <TextBlock
-                            x:Name="CapabilitiesText"
-                            Text="Select Refresh capabilities to inspect registered FFmpeg encoders and usable hardware devices."
-                            TextWrapping="Wrap"
-                            IsTextSelectionEnabled="True" />
-                    </StackPanel>
-                </ScrollViewer>
-
-                <ScrollViewer x:Name="AboutPage" Visibility="Collapsed">
-                    <StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="12">
-                        <TextBlock Text="About NativeShift" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Version 0.1.0" />
-                        <TextBlock Text="NativeShift converts supported files locally. It has no cloud upload, account, analytics, advertising, or mandatory telemetry." TextWrapping="Wrap" />
-                        <TextBlock Text="Codec and licensing information" FontSize="20" FontWeight="SemiBold" />
-                        <TextBlock Text="This build uses dynamically linked FFmpeg libraries configured without GPL-only or nonfree components. Codec patent rights vary by country and use case. See the bundled THIRD_PARTY_NOTICES.md and docs/codec-obligations.md in the source repository." TextWrapping="Wrap" />
-                        <TextBlock Text="Copyright and licence details are included with every release artifact." TextWrapping="Wrap" />
-                    </StackPanel>
-                </ScrollViewer>
+        <Grid x:Name="AppTitleBar" Background="{StaticResource ChromeBrush}">
+            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" />
+            <Grid Margin="8,0,150,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="SidebarButton" Style="{StaticResource ChromeButtonStyle}" Click="ToggleSidebar_Click" AutomationProperties.Name="Show or hide sidebar" ToolTipService.ToolTip="Show or hide sidebar">
+                    <FontIcon Glyph="&#xE89F;" FontSize="15" Foreground="{StaticResource SecondaryTextBrush}" RenderTransformOrigin="0.5,0.5"><FontIcon.RenderTransform><RotateTransform x:Name="SidebarIconTransform" /></FontIcon.RenderTransform></FontIcon>
+                </Button>
+                <Button x:Name="BackButton" Grid.Column="1" Width="28" Style="{StaticResource ChromeButtonStyle}" Click="Back_Click" AutomationProperties.Name="Back" ToolTipService.ToolTip="Back" IsHitTestVisible="False" Opacity="0.42">
+                    <FontIcon Glyph="&#xE72B;" FontSize="13" Foreground="{StaticResource SecondaryTextBrush}" />
+                </Button>
+                <Button x:Name="ForwardButton" Grid.Column="2" Width="28" Style="{StaticResource ChromeButtonStyle}" Click="Forward_Click" AutomationProperties.Name="Forward" ToolTipService.ToolTip="Forward" IsHitTestVisible="False" Opacity="0.42">
+                    <FontIcon Glyph="&#xE72A;" FontSize="13" Foreground="{StaticResource SecondaryTextBrush}" />
+                </Button>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="1">
+                    <Button Content="File" Style="{StaticResource MenuButtonStyle}"><Button.Flyout><MenuFlyout Placement="BottomEdgeAlignedLeft"><MenuFlyoutItem Text="New conversion" Click="NewConversion_Click" /><MenuFlyoutItem Text="Add files" Click="AddFiles_Click" /><MenuFlyoutItem Text="Add folder" Click="AddFolder_Click" /><MenuFlyoutSeparator /><MenuFlyoutItem Text="Settings" Tag="settings" Click="MenuNavigate_Click" /></MenuFlyout></Button.Flyout></Button>
+                    <Button Content="Edit" Style="{StaticResource MenuButtonStyle}"><Button.Flyout><MenuFlyout Placement="BottomEdgeAlignedLeft"><MenuFlyoutItem Text="Clear current files" Click="ClearCurrentSession_Click" /><MenuFlyoutItem Text="Clear completed jobs" Click="ClearCompleted_Click" /></MenuFlyout></Button.Flyout></Button>
+                    <Button Content="View" Style="{StaticResource MenuButtonStyle}"><Button.Flyout><MenuFlyout Placement="BottomEdgeAlignedLeft"><MenuFlyoutItem Text="Convert" Tag="convert" Click="MenuNavigate_Click" /><MenuFlyoutItem Text="Queue" Tag="queue" Click="MenuNavigate_Click" /><MenuFlyoutItem Text="Capabilities" Tag="capabilities" Click="MenuNavigate_Click" /></MenuFlyout></Button.Flyout></Button>
+                    <Button Content="Help" Style="{StaticResource MenuButtonStyle}"><Button.Flyout><MenuFlyout Placement="BottomEdgeAlignedLeft"><MenuFlyoutItem Text="About NativeShift" Tag="about" Click="MenuNavigate_Click" /></MenuFlyout></Button.Flyout></Button>
+                </StackPanel>
             </Grid>
-        </NavigationView>
+        </Grid>
+
+        <Grid x:Name="MainShell" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SidebarColumn" Width="250" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="SidebarPane" Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+                <Border.Transitions><TransitionCollection><PaneThemeTransition Edge="Left" /></TransitionCollection></Border.Transitions>
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="48" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Grid Margin="10,0,8,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="32" /></Grid.ColumnDefinitions>
+                        <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Left" Padding="7,5">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><Image Width="18" Height="18" Source="Assets/Square44x44Logo.targetsize-48_altform-lightunplated.png" /><TextBlock Text="NativeShift" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Style="{StaticResource ChromeButtonStyle}" Click="OpenQueue_Click" ToolTipService.ToolTip="Search queue" AutomationProperties.Name="Search queue"><SymbolIcon Symbol="Find" /></Button>
+                    </Grid>
+
+                    <StackPanel Grid.Row="1" Margin="0,4,0,0">
+                        <Button x:Name="NewConversionButton" Click="NewConversion_Click" Style="{StaticResource SidebarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE710;" FontSize="15" Width="18" /><TextBlock Text="New conversion" /></StackPanel></Button>
+                        <Button x:Name="ConvertNavButton" Tag="convert" Click="SidebarNavigation_Click" Style="{StaticResource SidebarButtonStyle}" Background="{StaticResource SidebarSelectedBrush}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE8C8;" FontSize="14" Width="18" /><TextBlock Text="Convert" /></StackPanel></Button>
+                        <Button x:Name="QueueNavButton" Tag="queue" Click="SidebarNavigation_Click" Style="{StaticResource SidebarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE8FD;" FontSize="14" Width="18" /><TextBlock Text="Queue" /></StackPanel></Button>
+                        <Button x:Name="SettingsNavButton" Tag="settings" Click="SidebarNavigation_Click" Style="{StaticResource SidebarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE713;" FontSize="14" Width="18" /><TextBlock Text="Settings" /></StackPanel></Button>
+                        <Button x:Name="CapabilitiesNavButton" Tag="capabilities" Click="SidebarNavigation_Click" Style="{StaticResource SidebarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE950;" FontSize="14" Width="18" /><TextBlock Text="Capabilities" /></StackPanel></Button>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Margin="12,24,12,0" Spacing="6">
+                        <TextBlock Text="JOBS" FontSize="11" Foreground="#777777" />
+                        <TextBlock x:Name="SidebarJobsEmpty" Text="Completed and active jobs will appear here." Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" FontSize="12" Margin="4,2" />
+                        <ListView x:Name="SidebarJobsList" Visibility="Collapsed" SelectionMode="None" IsItemClickEnabled="True" ItemClick="SidebarJob_ItemClick" ItemContainerStyle="{StaticResource SidebarJobItemStyle}" MaxHeight="280" />
+                    </StackPanel>
+
+                    <Button x:Name="AboutNavButton" Grid.Row="3" Tag="about" Click="SidebarNavigation_Click" Style="{StaticResource SidebarButtonStyle}" Margin="6,4,6,8">
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border Width="26" Height="26" CornerRadius="13" Background="#4A4A4A"><TextBlock Text="N" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></Border><StackPanel Grid.Column="1" Margin="9,0,0,0"><TextBlock Text="NativeShift" FontSize="13" /><TextBlock Text="Local only · v0.2.0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel></Grid>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1" Background="{StaticResource AppBackgroundBrush}">
+                <Grid Margin="18">
+                    <SplitView x:Name="ConvertPage" DisplayMode="Overlay" PanePlacement="Right" OpenPaneLength="390" CompactPaneLength="0" IsPaneOpen="False">
+                        <SplitView.Transitions><TransitionCollection><EntranceThemeTransition FromHorizontalOffset="10" /></TransitionCollection></SplitView.Transitions>
+                        <SplitView.Pane>
+                            <Border Background="#171717" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0" Padding="18">
+                                <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Spacing="12">
+                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Conversion options" FontSize="19" FontWeight="SemiBold" /><TextBlock Text="Options for the selected file type." Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel><Button Grid.Column="1" Content="Close" Click="ToggleOptions_Click" /></Grid>
+                                        <CheckBox x:Name="RecursiveFolders" Content="Include subfolders when adding a folder" IsChecked="True" />
+                                        <TextBlock x:Name="OptionsEmptyText" Text="Add a supported file and NativeShift will show its available options here." Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                                        <StackPanel x:Name="ImageOptionsPanel" Spacing="9"><ComboBox x:Name="ImagePresetSelector" Header="Image preset" SelectedIndex="0"><ComboBoxItem Content="Custom" /><ComboBoxItem Content="JPEG high quality" Tag="jpeg-high" /><ComboBoxItem Content="WebP balanced" Tag="webp-balanced" /></ComboBox><ComboBox x:Name="ImageOutputFormat" Header="Output format" SelectedIndex="0"><ComboBoxItem Content="png" /><ComboBoxItem Content="jpeg" /><ComboBoxItem Content="webp" /><ComboBoxItem Content="bmp" /><ComboBoxItem Content="tiff" /></ComboBox><NumberBox x:Name="ImageQuality" Header="Quality" Value="85" Minimum="1" Maximum="100" /><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><NumberBox x:Name="ImageWidth" Header="Width (optional)" Minimum="1" SpinButtonPlacementMode="Compact" /><NumberBox x:Name="ImageHeight" Grid.Column="1" Header="Height (optional)" Minimum="1" SpinButtonPlacementMode="Compact" /></Grid></StackPanel>
+                                        <StackPanel x:Name="AudioOptionsPanel" Visibility="Collapsed" Spacing="9"><ComboBox x:Name="AudioPresetSelector" Header="Audio preset" SelectedIndex="0"><ComboBoxItem Content="Custom" /><ComboBoxItem Content="MP3 high quality" Tag="mp3-high" /><ComboBoxItem Content="Opus voice" Tag="opus-voice" /></ComboBox><ComboBox x:Name="AudioOutputFormat" Header="Output format" SelectedIndex="0"><ComboBoxItem Content="mp3" /><ComboBoxItem Content="wav" /><ComboBoxItem Content="flac" /><ComboBoxItem Content="aac" /><ComboBoxItem Content="m4a" /><ComboBoxItem Content="ogg" /><ComboBoxItem Content="opus" /></ComboBox><ComboBox x:Name="AudioCodec" Header="Codec" SelectedIndex="0"><ComboBoxItem Content="Automatic" Tag="automatic" /><ComboBoxItem Content="MP3" Tag="mp3" /><ComboBoxItem Content="PCM 16-bit" Tag="pcm" /><ComboBoxItem Content="FLAC" Tag="flac" /><ComboBoxItem Content="AAC" Tag="aac" /><ComboBoxItem Content="Vorbis" Tag="vorbis" /><ComboBoxItem Content="Opus" Tag="opus" /><ComboBoxItem Content="Stream copy" Tag="copy" /></ComboBox><NumberBox x:Name="AudioBitrate" Header="Bitrate (kbps)" Value="192" Minimum="8" Maximum="1536" /></StackPanel>
+                                        <StackPanel x:Name="VideoOptionsPanel" Visibility="Collapsed" Spacing="9"><ComboBox x:Name="VideoPresetSelector" Header="Video preset" SelectedIndex="0"><ComboBoxItem Content="Custom" /><ComboBoxItem Content="MP4 H.264 compatibility" Tag="mp4-h264" /><ComboBoxItem Content="WebM VP9" Tag="webm-vp9" /></ComboBox><ComboBox x:Name="VideoOutputFormat" Header="Output format" SelectedIndex="0"><ComboBoxItem Content="mp4" /><ComboBoxItem Content="mkv" /><ComboBoxItem Content="webm" /></ComboBox><ComboBox x:Name="VideoCodec" Header="Codec" SelectedIndex="0"><ComboBoxItem Content="Automatic" Tag="automatic" /><ComboBoxItem Content="H.264" Tag="h264" /><ComboBoxItem Content="H.265 / HEVC" Tag="h265" /><ComboBoxItem Content="VP9" Tag="vp9" /><ComboBoxItem Content="AV1" Tag="av1" /><ComboBoxItem Content="Stream copy" Tag="copy" /></ComboBox><NumberBox x:Name="VideoQuality" Header="Quality (codec scale)" Value="23" Minimum="0" Maximum="63" /><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><NumberBox x:Name="VideoWidth" Header="Width (optional)" Minimum="1" SpinButtonPlacementMode="Compact" /><NumberBox x:Name="VideoHeight" Grid.Column="1" Header="Height (optional)" Minimum="1" SpinButtonPlacementMode="Compact" /></Grid></StackPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </SplitView.Pane>
+                        <SplitView.Content>
+                            <Grid x:Name="DropArea">
+                                <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="20">
+                                    <Border Width="58" Height="58" CornerRadius="29" Background="#2B2B2B"><FontIcon Glyph="&#xE8B7;" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                                    <TextBlock x:Name="ModeTitle" Text="Files to start" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Drop files anywhere in this workspace" Foreground="{StaticResource SecondaryTextBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" MaxWidth="820" HorizontalAlignment="Stretch" Spacing="8">
+                                    <Border x:Name="AddedFilesCard" Background="#292929" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12" Visibility="Collapsed">
+                                        <Grid RowSpacing="8"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock x:Name="AddedFilesHeading" Text="Files added" FontWeight="SemiBold" VerticalAlignment="Center" /><Button Grid.Column="1" Content="Clear files" Click="ClearCurrentSession_Click" Padding="9,4" Margin="0,0,6,0" /><Button Grid.Column="2" Content="Open queue" Click="OpenQueue_Click" Padding="9,4" /></Grid><Grid Grid.Row="1" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border x:Name="ImagePreviewBorder" Width="96" Height="76" CornerRadius="8" Background="#1F1F1F" Visibility="Collapsed"><Grid><Image x:Name="ImagePreview" Stretch="UniformToFill" /><FontIcon x:Name="ImagePreviewPlaceholder" Glyph="&#xEB9F;" FontSize="22" Foreground="{StaticResource SecondaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Grid></Border><ListView x:Name="AddedFilesList" Grid.Column="1" MaxHeight="135" IsItemClickEnabled="False" SelectionMode="None" /></Grid></Grid>
+                                    </Border>
+                                    <Border Background="{StaticResource InputBrush}" BorderBrush="#444444" BorderThickness="1" CornerRadius="18" Padding="13,11">
+                                        <StackPanel Spacing="10">
+                                    <TextBlock x:Name="ModeDescription" Text="Images, audio, and video" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <Button Width="34" Height="34" MinWidth="34" VerticalAlignment="Center" CornerRadius="17" Padding="0" Click="AddFiles_Click" AutomationProperties.Name="Add files" ToolTipService.ToolTip="Add files"><FontIcon Glyph="&#xE710;" FontSize="13" /></Button>
+                                                <Grid Grid.Column="1" VerticalAlignment="Center">
+                                                    <StackPanel x:Name="DetectedTypePanel" Orientation="Horizontal" Spacing="5" Visibility="Collapsed">
+                                                        <Button x:Name="DetectedImagesButton" Tag="image" Content="Images" Click="DetectedType_Click" Style="{StaticResource DetectedTypeButtonStyle}" Visibility="Collapsed" />
+                                                        <Button x:Name="DetectedAudioButton" Tag="audio" Content="Audio" Click="DetectedType_Click" Style="{StaticResource DetectedTypeButtonStyle}" Visibility="Collapsed" />
+                                                        <Button x:Name="DetectedVideoButton" Tag="video" Content="Video" Click="DetectedType_Click" Style="{StaticResource DetectedTypeButtonStyle}" Visibility="Collapsed" />
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Button x:Name="OptionsButton" Grid.Column="2" Height="34" VerticalAlignment="Center" Content="Options" Click="ToggleOptions_Click" IsEnabled="False" />
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="5,0"><TextBlock Text="Output" FontSize="11" Foreground="#808080" /><TextBlock x:Name="OutputLocationText" Text="Same folder as source" FontSize="12" Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" /></StackPanel>
+                                                <Button x:Name="ConvertButton" Grid.Column="4" Width="38" Height="38" MinWidth="38" VerticalAlignment="Center" CornerRadius="19" Padding="0" Click="Convert_Click" Style="{StaticResource PrimaryButtonStyle}" AutomationProperties.Name="Convert" ToolTipService.ToolTip="Add a file first" IsEnabled="False">
+                                                    <Button.Resources>
+                                                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F4F4F4" />
+                                                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#F4F4F4" />
+                                                        <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#111111" />
+                                                        <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#111111" />
+                                                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                                                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                                                    </Button.Resources>
+                                                    <FontIcon Glyph="&#xE72A;" FontSize="14" Foreground="#111111" />
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <TextBlock x:Name="ConvertStatus" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" TextAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+                                </StackPanel>
+                            </Grid>
+                        </SplitView.Content>
+                    </SplitView>
+
+                    <Grid x:Name="QueuePage" Visibility="Collapsed">
+                        <Grid.Transitions><TransitionCollection><EntranceThemeTransition FromHorizontalOffset="18" /></TransitionCollection></Grid.Transitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Spacing="3"><TextBlock Text="Conversion queue" FontSize="27" FontWeight="SemiBold" /><TextBlock Text="Jobs remain visible after completion." Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel><StackPanel x:Name="QueueActivityPanel" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed"><ProgressRing x:Name="QueueActivity" Width="20" Height="20" IsActive="False" /><TextBlock Text="Converting" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" /></StackPanel></Grid>
+                        <Grid Grid.Row="1" Margin="0,14,0,10" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="SearchBox" PlaceholderText="Search files" TextChanged="SearchBox_TextChanged" /><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"><ComboBox x:Name="QueueTypeFilter" MinWidth="125" SelectedIndex="0"><ComboBoxItem Content="All types" Tag="all" /><ComboBoxItem Content="Images" Tag="image" /><ComboBoxItem Content="Audio" Tag="audio" /><ComboBoxItem Content="Video" Tag="video" /></ComboBox><ComboBox x:Name="StateFilter" MinWidth="135" SelectedIndex="0"><ComboBoxItem Content="All statuses" Tag="all" /><ComboBoxItem Content="Ready" Tag="ready" /><ComboBoxItem Content="Pending" Tag="pending" /><ComboBoxItem Content="Converting" Tag="converting" /><ComboBoxItem Content="Completed" Tag="completed" /><ComboBoxItem Content="Warnings" Tag="completed_with_warnings" /><ComboBoxItem Content="Failed" Tag="failed" /><ComboBoxItem Content="Cancelled" Tag="cancelled" /></ComboBox></StackPanel></Grid>
+                        <ListView x:Name="QueueList" Grid.Row="2" SelectionMode="Single" ItemContainerStyle="{StaticResource QueueItemStyle}" SelectionChanged="QueueList_SelectionChanged" />
+                        <Border Grid.Row="3" Background="#292929" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="12" Margin="0,6,0,0"><TextBlock x:Name="DetailsText" Text="Select a job to view its paths, progress, codec, warnings, or error." TextWrapping="Wrap" IsTextSelectionEnabled="True" MaxHeight="120" /></Border>
+                        <Grid Grid.Row="4" Margin="0,8,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><ProgressBar x:Name="OverallProgress" Minimum="0" Maximum="100" Height="3" /><CommandBar Grid.Row="1" Margin="0,5,0,0" Background="Transparent" DefaultLabelPosition="Right"><AppBarButton x:Name="PauseQueueButton" Icon="Pause" Label="Pause" Click="Pause_Click" /><AppBarButton x:Name="ResumeQueueButton" Icon="Play" Label="Resume" Click="Resume_Click" IsEnabled="False" /><AppBarSeparator /><AppBarButton x:Name="CancelSelectedButton" Icon="Cancel" Label="Cancel selected" Click="CancelSelected_Click" IsEnabled="False" /><AppBarButton x:Name="RetrySelectedButton" Icon="Refresh" Label="Retry" Click="RetrySelected_Click" IsEnabled="False" /><AppBarButton x:Name="RemoveSelectedButton" Icon="Delete" Label="Remove" Click="RemoveSelected_Click" IsEnabled="False" /><AppBarButton x:Name="OpenOutputButton" Icon="OpenLocal" Label="Open output" Click="OpenOutput_Click" IsEnabled="False" /><CommandBar.SecondaryCommands><AppBarButton x:Name="CancelAllButton" Label="Cancel all jobs" Click="CancelAll_Click" /><AppBarButton x:Name="ClearCompletedButton" Label="Clear completed jobs" Click="ClearCompleted_Click" /></CommandBar.SecondaryCommands></CommandBar></Grid>
+                    </Grid>
+
+                    <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                        <StackPanel MaxWidth="940" HorizontalAlignment="Center" Spacing="15">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Settings" FontSize="27" FontWeight="SemiBold" />
+                                <TextBlock Text="Global defaults apply to every new conversion." Foreground="{StaticResource SecondaryTextBrush}" />
+                            </StackPanel>
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Files and performance" FontSize="18" FontWeight="SemiBold" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="DefaultOutputFolderSetting" Header="Default output folder (blank uses each source folder)" IsReadOnly="True" />
+                                        <Button Grid.Column="1" Content="Browse" VerticalAlignment="Bottom" Click="BrowseOutput_Click" />
+                                    </Grid>
+                                    <NumberBox x:Name="MaximumJobsSetting" Header="Maximum concurrent conversions (after restart)" Minimum="1" Maximum="32" Value="2" />
+                                    <ComboBox x:Name="HardwareSetting" Header="Hardware acceleration" SelectedIndex="0">
+                                        <ComboBoxItem Content="Automatic" Tag="auto" />
+                                        <ComboBoxItem Content="Prefer hardware" Tag="prefer_hardware" />
+                                        <ComboBoxItem Content="Software only" Tag="disabled" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Output behavior" FontSize="18" FontWeight="SemiBold" />
+                                    <ToggleSwitch x:Name="PreserveMetadataSetting" Header="Preserve metadata where supported" />
+                                    <ComboBox x:Name="ExistingFilePolicySetting" Header="When an output already exists" SelectedIndex="3">
+                                        <ComboBoxItem Content="Ask" Tag="ask" />
+                                        <ComboBoxItem Content="Skip" Tag="skip" />
+                                        <ComboBoxItem Content="Replace" Tag="replace" />
+                                        <ComboBoxItem Content="Generate a unique name" Tag="unique" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="App and privacy" FontSize="18" FontWeight="SemiBold" />
+                                    <ComboBox x:Name="ThemeSetting" Header="Appearance" SelectedIndex="0">
+                                        <ComboBoxItem Content="Dark" Tag="dark" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="LoggingSetting" Header="Logging level" SelectedIndex="1">
+                                        <ComboBoxItem Content="Debug (may include full paths)" Tag="debug" />
+                                        <ComboBoxItem Content="Information" Tag="information" />
+                                        <ComboBoxItem Content="Warning" Tag="warning" />
+                                        <ComboBoxItem Content="Error" Tag="error" />
+                                    </ComboBox>
+                                    <ToggleSwitch x:Name="NotificationsSetting" Header="Completion notifications" IsOn="True" />
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Spacing="8" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                    <Button Content="Save settings" Click="SaveSettings_Click" Style="{StaticResource PrimaryButtonStyle}" />
+                                    <Button Content="Reset defaults" Click="ResetSettings_Click" />
+                                    <Button Content="Open logs" Click="OpenLogs_Click" />
+                                    <Button Content="Copy diagnostics" Click="CopyDiagnostics_Click" />
+                                </StackPanel>
+                                <TextBlock x:Name="SettingsStatus" TextWrapping="Wrap" TextAlignment="Right" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <ScrollViewer x:Name="CapabilitiesPage" Visibility="Collapsed"><StackPanel MaxWidth="820" HorizontalAlignment="Left" Spacing="15"><TextBlock Text="Capabilities" FontSize="27" FontWeight="SemiBold" /><TextBlock Text="Inspect codecs and hardware devices available on this computer." Foreground="{StaticResource SecondaryTextBrush}" /><Button Content="Refresh capabilities" Click="RefreshCapabilities_Click" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" /><Border Style="{StaticResource SettingsCardStyle}"><TextBlock x:Name="CapabilitiesText" Text="Select refresh to inspect this computer." TextWrapping="Wrap" IsTextSelectionEnabled="True" /></Border></StackPanel></ScrollViewer>
+                    <ScrollViewer x:Name="AboutPage" Visibility="Collapsed"><StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="15"><TextBlock Text="About NativeShift" FontSize="27" FontWeight="SemiBold" /><Border Style="{StaticResource SettingsCardStyle}"><StackPanel Spacing="9"><TextBlock Text="NativeShift 0.2.0" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Private, local image, audio, and video conversion. No uploads, account, analytics, advertising, or telemetry." TextWrapping="Wrap" /><TextBlock Text="The portable build is self-contained. The development MSIX remains unsigned until a trusted publisher certificate is configured." Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" /></StackPanel></Border></StackPanel></ScrollViewer>
+                </Grid>
+            </Grid>
+        </Grid>
     </Grid>
 </Window>

@@ -7,6 +7,11 @@ on:
         description: Existing v-prefixed version tag
         required: true
         type: string
+      include_msix:
+        description: Also include the unsigned development MSIX
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -56,12 +61,17 @@ jobs:
         shell: pwsh
         env:
           RELEASE_TAG: ${{ inputs.tag }}
+          INCLUDE_MSIX: ${{ inputs.include_msix }}
         run: |
           $version = $env:RELEASE_TAG.Substring(1)
-          ./scripts/build-packages.ps1 -Version $version
+          $parameters = @{ Version = $version }
+          if ($env:INCLUDE_MSIX -eq 'true') {
+            $parameters.IncludeMsix = $true
+          }
+          ./scripts/build-packages.ps1 @parameters
           ctest --preset release --timeout 180
           ./scripts/run-cli-smoke.ps1 -Configuration Release
-          ./scripts/verify-packages.ps1 -Version $version
+          ./scripts/verify-packages.ps1 @parameters
       - name: Upload verified payload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

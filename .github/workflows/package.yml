@@ -1,11 +1,13 @@
-name: Package candidates
+name: Portable package candidates
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      include_msix:
+        description: Also build the unsigned development MSIX
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -16,7 +18,7 @@ concurrency:
 
 jobs:
   package:
-    name: Build and verify unsigned packages
+    name: Build and verify portable packages
     runs-on: windows-2025
     timeout-minutes: 150
     env:
@@ -37,13 +39,19 @@ jobs:
           restore-keys: vcpkg-${{ runner.os }}-x64-
       - name: Build and verify package candidates
         shell: pwsh
+        env:
+          INCLUDE_MSIX: ${{ inputs.include_msix }}
         run: |
-          ./scripts/build-packages.ps1 -Version 0.1.0
-          ./scripts/verify-packages.ps1 -Version 0.1.0
-      - name: Upload unsigned test artifacts
+          $parameters = @{ Version = '0.2.0' }
+          if ($env:INCLUDE_MSIX -eq 'true') {
+            $parameters.IncludeMsix = $true
+          }
+          ./scripts/build-packages.ps1 @parameters
+          ./scripts/verify-packages.ps1 @parameters
+      - name: Upload portable test artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: NativeShift-0.1.0-unsigned-candidates
+          name: NativeShift-0.2.0-portable-candidates
           path: out/packages/
           if-no-files-found: error
           retention-days: 7

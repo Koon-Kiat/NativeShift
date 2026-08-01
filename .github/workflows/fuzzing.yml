@@ -1,13 +1,6 @@
 name: ClusterFuzzLite
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - .clusterfuzzlite/**
-      - .github/workflows/fuzzing.yml
-      - fuzz/**
-      - src/NativeShift.Core/**
   schedule:
     - cron: '41 18 * * 5'
   workflow_dispatch:
@@ -45,10 +38,8 @@ jobs:
         uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
         with:
           github-token: ${{ github.token }}
-          fuzz-seconds: ${{ github.event_name == 'pull_request' && '180' || '600' }}
-          mode: ${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }}
+          fuzz-seconds: '600'
+          mode: batch
           sanitizer: address
           parallel-fuzzing: true
-          output-sarif: >-
-            ${{ github.event_name != 'pull_request' ||
-                github.event.pull_request.head.repo.full_name == github.repository }}
+          output-sarif: true
