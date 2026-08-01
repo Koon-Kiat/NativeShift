@@ -94,4 +94,7 @@ jobs:
           cmake --build --preset asan
       - name: Run representative tests
         shell: pwsh
-        run: ctest --preset asan --timeout 180
+        run: |
+          . ./scripts/initialize-build-environment.ps1
+          Initialize-NativeBuildEnvironment
+          ctest --preset asan --timeout 180
