@@ -28,7 +28,7 @@ jobs:
     env:
       VCPKG_ROOT: C:\vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\out\vcpkg-cache,readwrite
-      VCPKG_MAX_CONCURRENCY: 2
+      VCPKG_MAX_CONCURRENCY: 4
     steps:
       - name: Check out clean source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

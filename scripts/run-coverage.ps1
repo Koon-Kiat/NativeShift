@@ -15,11 +15,17 @@ $html = Join-Path $coverageRoot 'html'
 New-Item -ItemType Directory -Path $coverageRoot -Force | Out-Null
 
 $coverageTool = Get-Command OpenCppCoverage.exe -ErrorAction SilentlyContinue
-if (-not $coverageTool) {
+$coverageToolPath = if ($coverageTool) {
+    $coverageTool.Source
+}
+else {
+    Join-Path $env:ProgramFiles 'OpenCppCoverage\OpenCppCoverage.exe'
+}
+if (-not (Test-Path -LiteralPath $coverageToolPath -PathType Leaf)) {
     throw 'OpenCppCoverage.exe was not found.'
 }
 
-& $coverageTool.Source `
+& $coverageToolPath `
     "--sources=$(Join-Path $repositoryRoot 'src\NativeShift.Core')" `
     "--sources=$(Join-Path $repositoryRoot 'src\NativeShift.Image')" `
     "--sources=$(Join-Path $repositoryRoot 'src\NativeShift.Media')" `
