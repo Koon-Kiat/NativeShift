@@ -23,7 +23,7 @@ jobs:
     env:
       VCPKG_ROOT: C:\vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\out\vcpkg-cache,readwrite
-      VCPKG_MAX_CONCURRENCY: 2
+      VCPKG_MAX_CONCURRENCY: 4
     steps:
       - name: Validate tag input
         shell: pwsh
