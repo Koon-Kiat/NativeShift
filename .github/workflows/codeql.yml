@@ -32,12 +32,23 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Resolve runner image cache key
+        id: runner-image
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ImageVersion)) {
+            throw 'ImageVersion is unavailable on this hosted runner.'
+          }
+          "version=$($env:ImageVersion)" >> $env:GITHUB_OUTPUT
       - name: Restore vcpkg binary cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/vcpkg-cache
-          key: vcpkg-${{ runner.os }}-x64-${{ hashFiles('vcpkg.json') }}
-          restore-keys: vcpkg-${{ runner.os }}-x64-
+          key: vcpkg-${{ runner.os }}-x64-Release-${{ steps.runner-image.outputs.version }}-${{ hashFiles('vcpkg.json', 'CMakePresets.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-x64-Release-${{ steps.runner-image.outputs.version }}-
+            vcpkg-${{ runner.os }}-x64-Release-
+            vcpkg-${{ runner.os }}-x64-
       - name: Configure clean Release build
         shell: pwsh
         run: |
