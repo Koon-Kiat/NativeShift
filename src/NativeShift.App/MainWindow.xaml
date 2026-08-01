@@ -269,7 +269,7 @@
                         <TextBlock Text="Version 0.1.0" />
                         <TextBlock Text="NativeShift converts supported files locally. It has no cloud upload, account, analytics, advertising, or mandatory telemetry." TextWrapping="Wrap" />
                         <TextBlock Text="Codec and licensing information" FontSize="20" FontWeight="SemiBold" />
-                        <TextBlock Text="This build uses dynamically linked FFmpeg libraries configured without GPL-only or nonfree components. Codec patent rights vary by country and use case. See THIRD_PARTY_NOTICES.md and docs/licensing.md in the distribution." TextWrapping="Wrap" />
+                        <TextBlock Text="This build uses dynamically linked FFmpeg libraries configured without GPL-only or nonfree components. Codec patent rights vary by country and use case. See the bundled THIRD_PARTY_NOTICES.md and docs/codec-obligations.md in the source repository." TextWrapping="Wrap" />
                         <TextBlock Text="Copyright and licence details are included with every release artifact." TextWrapping="Wrap" />
                     </StackPanel>
                 </ScrollViewer>

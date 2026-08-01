@@ -85,11 +85,11 @@ ConversionResult ConversionEngine::Convert(ConversionRequest request,
                                            ProgressCallback progress,
                                            const std::stop_token cancellation) {
     const auto started = std::chrono::steady_clock::now();
-    const auto finish = [this](ConversionResult result) {
+    const auto finish = [this](ConversionResult&& result) -> ConversionResult {
         if (logger_ != nullptr) {
             logger_->LogConversion(result);
         }
-        return result;
+        return std::move(result);
     };
 
     try {
