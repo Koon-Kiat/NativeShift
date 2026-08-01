@@ -34,7 +34,7 @@ jobs:
           restore-keys: vcpkg-${{ runner.os }}-x64-
       - name: Install pinned cppcheck
         shell: pwsh
-        run: choco install cppcheck --version=2.18.0 --yes --no-progress
+        run: choco install cppcheck --version=2.19.0 --yes --no-progress
       - name: Run clang-tidy, cppcheck, and MSVC analyze
         shell: pwsh
         run: ./scripts/run-static-analysis.ps1
