@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace winrt;
@@ -329,12 +330,134 @@ void MainWindow::SidebarJob_ItemClick(IInspectable const&,
     }
 }
 
+void MainWindow::SidebarJobAction_Click(IInspectable const& sender,
+                                        RoutedEventArgs const& event) {
+    (void)event;
+    const auto button = sender.try_as<Button>();
+    if (!button) {
+        return;
+    }
+    const std::wstring tag = unbox_value_or<hstring>(button.Tag(), L"").c_str();
+    const auto separator = tag.find(L':');
+    if (separator == std::wstring::npos) {
+        return;
+    }
+
+    std::uint64_t id{};
+    try {
+        id = std::stoull(tag.substr(separator + 1));
+    } catch (...) {
+        return;
+    }
+    const auto found = std::ranges::find_if(
+        view_model_.Rows(), [id](const auto& row) { return row.id == id; });
+    if (found == view_model_.Rows().end()) {
+        return;
+    }
+    const auto index = static_cast<std::size_t>(
+        std::distance(view_model_.Rows().begin(), found));
+    const auto action = std::wstring_view(tag).substr(0, separator);
+
+    if (action == L"pin") {
+        if (!pinned_jobs_.erase(id)) {
+            pinned_jobs_.insert(id);
+        }
+    } else if (action == L"archive") {
+        pinned_jobs_.erase(id);
+        archived_jobs_.insert(id);
+    } else if (action == L"delete" && found->IsTerminal()) {
+        pinned_jobs_.erase(id);
+        archived_jobs_.erase(id);
+        view_model_.Remove(index);
+    }
+    sidebar_job_texts_.clear();
+    RefreshView();
+}
+
+Grid MainWindow::BuildSidebarJobItem(
+    const ::NativeShift::presentation::QueueRow& row, const bool pinned) {
+    Grid item;
+    item.Background(RootLayout()
+                        .Resources()
+                        .Lookup(box_value(L"TransparentBrush"))
+                        .as<Media::Brush>());
+    item.MinHeight(38);
+
+    StackPanel labels;
+    labels.Margin(Thickness{0, 0, 82, 0});
+    TextBlock name;
+    name.Text(row.input_path.filename().native());
+    name.FontSize(12);
+    name.TextTrimming(TextTrimming::CharacterEllipsis);
+    TextBlock state;
+    auto state_text = row.state;
+    std::ranges::replace(state_text, L'_', L' ');
+    state.Text((pinned ? L"Pinned · " : L"") + state_text);
+    state.FontSize(11);
+    state.Opacity(0.66);
+    labels.Children().Append(name);
+    labels.Children().Append(state);
+    item.Children().Append(labels);
+
+    StackPanel actions;
+    actions.Orientation(Orientation::Horizontal);
+    actions.Spacing(1);
+    actions.HorizontalAlignment(HorizontalAlignment::Right);
+    actions.VerticalAlignment(VerticalAlignment::Center);
+    actions.Opacity(0);
+    actions.IsHitTestVisible(false);
+    const auto action_style =
+        RootLayout()
+            .Resources()
+            .Lookup(box_value(L"SidebarJobActionButtonStyle"))
+            .as<Style>();
+
+    const auto add_action = [&](const std::wstring_view action,
+                                const wchar_t* glyph,
+                                const std::wstring_view label,
+                                const bool enabled = true) {
+        Button button;
+        button.Style(action_style);
+        button.Tag(box_value(
+            hstring(std::wstring(action) + L":" + std::to_wstring(row.id))));
+        button.IsEnabled(enabled);
+        FontIcon icon;
+        icon.Glyph(glyph);
+        icon.FontSize(12);
+        button.Content(icon);
+        Automation::AutomationProperties::SetName(button, hstring(label));
+        ToolTipService::SetToolTip(button, box_value(hstring(label)));
+        button.Click({this, &MainWindow::SidebarJobAction_Click});
+        actions.Children().Append(button);
+    };
+    add_action(L"pin", pinned ? L"\uE77A" : L"\uE718",
+               pinned ? L"Unpin job" : L"Pin job");
+    add_action(L"archive", L"\uE7B8", L"Archive from sidebar");
+    add_action(L"delete", L"\uE74D", L"Delete job", row.IsTerminal());
+    item.Children().Append(actions);
+
+    item.PointerEntered(
+        [actions](IInspectable const&,
+                  Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&) {
+            actions.Opacity(1);
+            actions.IsHitTestVisible(true);
+        });
+    item.PointerExited(
+        [actions](IInspectable const&,
+                  Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const&) {
+            actions.Opacity(0);
+            actions.IsHitTestVisible(false);
+        });
+    return item;
+}
+
 void MainWindow::DropArea_DragOver(IInspectable const&,
                                    DragEventArgs const& event) {
     if (event.DataView().Contains(StandardDataFormats::StorageItems())) {
         event.AcceptedOperation(DataPackageOperation::Copy);
         event.DragUIOverride().Caption(L"Add to NativeShift");
         event.DragUIOverride().IsCaptionVisible(true);
+        event.Handled(true);
     }
 }
 
@@ -345,6 +468,7 @@ fire_and_forget MainWindow::DropArea_Drop(IInspectable const&,
     if (!data.Contains(StandardDataFormats::StorageItems())) {
         co_return;
     }
+    event.Handled(true);
     const auto items = co_await data.GetStorageItemsAsync();
     std::vector<std::filesystem::path> files;
     std::vector<std::filesystem::path> folders;
@@ -689,26 +813,43 @@ void MainWindow::RefreshView() {
     QueueActivityPanel().Visibility(has_active_job ? Visibility::Visible
                                                    : Visibility::Collapsed);
 
+    const auto job_exists = [this](const std::uint64_t id) {
+        return std::ranges::any_of(
+            view_model_.Rows(), [id](const auto& row) { return row.id == id; });
+    };
+    std::erase_if(pinned_jobs_, [&](const auto id) { return !job_exists(id); });
+    std::erase_if(archived_jobs_,
+                  [&](const auto id) { return !job_exists(id); });
+
     std::vector<std::size_t> next_sidebar_indices;
     std::vector<std::wstring> next_sidebar_texts;
-    for (std::size_t offset = 0;
-         offset < view_model_.Rows().size() && next_sidebar_indices.size() < 6;
-         ++offset) {
-        const auto index = view_model_.Rows().size() - 1 - offset;
-        const auto& row = view_model_.Rows()[index];
-        if (row.id == 0) {
-            continue;
+    const auto append_sidebar_jobs = [&](const bool pinned) {
+        for (std::size_t offset = 0; offset < view_model_.Rows().size() &&
+                                     next_sidebar_indices.size() < 8;
+             ++offset) {
+            const auto index = view_model_.Rows().size() - 1 - offset;
+            const auto& row = view_model_.Rows()[index];
+            if (row.id == 0 || archived_jobs_.contains(row.id) ||
+                pinned_jobs_.contains(row.id) != pinned) {
+                continue;
+            }
+            auto state = row.state;
+            std::ranges::replace(state, L'_', L' ');
+            next_sidebar_indices.push_back(index);
+            next_sidebar_texts.push_back(std::to_wstring(row.id) + L"|" +
+                                         row.input_path.filename().native() +
+                                         L"|" + state +
+                                         (pinned ? L"|pinned" : L"|recent"));
         }
-        auto state = row.state;
-        std::ranges::replace(state, L'_', L' ');
-        next_sidebar_indices.push_back(index);
-        next_sidebar_texts.push_back(row.input_path.filename().native() +
-                                     L"\n" + state);
-    }
+    };
+    append_sidebar_jobs(true);
+    append_sidebar_jobs(false);
     if (next_sidebar_texts != sidebar_job_texts_) {
         SidebarJobsList().Items().Clear();
-        for (const auto& text : next_sidebar_texts) {
-            SidebarJobsList().Items().Append(box_value(hstring(text)));
+        for (const auto index : next_sidebar_indices) {
+            const auto& row = view_model_.Rows()[index];
+            SidebarJobsList().Items().Append(
+                BuildSidebarJobItem(row, pinned_jobs_.contains(row.id)));
         }
         sidebar_job_texts_ = next_sidebar_texts;
     }
@@ -948,7 +1089,10 @@ ComboBox MainWindow::ActiveOutputFormat() {
     return ImageOutputFormat();
 }
 
-void MainWindow::ShowQueuePage() { NavigateTo(L"queue", true); }
+void MainWindow::ShowQueuePage() {
+    NavigateTo(L"queue", true);
+    SearchBox().Focus(FocusState::Programmatic);
+}
 
 void MainWindow::UpdateAddedFiles() {
     std::vector<std::wstring> next_texts;

@@ -16,8 +16,8 @@ only for package-development tests.
 Build and verify them from an x64 Developer PowerShell:
 
 ```powershell
-.\scripts\build-packages.ps1 -Version 0.1.0
-.\scripts\verify-packages.ps1 -Version 0.1.0
+.\scripts\build-packages.ps1 -Version 0.2.0
+.\scripts\verify-packages.ps1 -Version 0.2.0
 ```
 
 To additionally build and verify the development MSIX, pass `-IncludeMsix` to

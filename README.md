@@ -79,8 +79,8 @@ JSON mode reserves standard output for stable JSON. See the
 ## Packages
 
 ```powershell
-.\scripts\build-packages.ps1 -Version 0.1.0
-.\scripts\verify-packages.ps1 -Version 0.1.0
+.\scripts\build-packages.ps1 -Version 0.2.0
+.\scripts\verify-packages.ps1 -Version 0.2.0
 ```
 
 The default pipeline creates a portable GUI ZIP, CLI ZIP, symbols ZIP, SPDX JSON

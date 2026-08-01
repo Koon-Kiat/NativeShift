@@ -6,7 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="NativeShift">
-    <Grid x:Name="RootLayout" Background="#212121" RequestedTheme="Dark">
+    <Grid x:Name="RootLayout" Background="#212121" RequestedTheme="Dark" AllowDrop="True" DragOver="DropArea_DragOver" Drop="DropArea_Drop">
         <Grid.Resources>
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#212121" />
             <SolidColorBrush x:Key="ChromeBrush" Color="#212121" />
@@ -96,6 +96,16 @@
                 <Setter Property="Margin" Value="0,1" />
                 <Setter Property="MinHeight" Value="32" />
             </Style>
+            <Style x:Key="SidebarJobActionButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="26" />
+                <Setter Property="Height" Value="26" />
+                <Setter Property="MinWidth" Value="26" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="5" />
+                <Setter Property="UseSystemFocusVisuals" Value="False" />
+            </Style>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -144,7 +154,7 @@
                     <Grid Margin="10,0,8,0">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="32" /></Grid.ColumnDefinitions>
                         <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Left" Padding="7,5">
-                            <StackPanel Orientation="Horizontal" Spacing="8"><Image Width="18" Height="18" Source="Assets/Square44x44Logo.targetsize-48_altform-lightunplated.png" /><TextBlock Text="NativeShift" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" /><FontIcon Glyph="&#xE70D;" FontSize="9" VerticalAlignment="Center" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8"><Image Width="18" Height="18" Source="Assets/Square44x44Logo.targetsize-48_altform-lightunplated.png" /><TextBlock Text="NativeShift" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                         <Button Grid.Column="1" Style="{StaticResource ChromeButtonStyle}" Click="OpenQueue_Click" ToolTipService.ToolTip="Search queue" AutomationProperties.Name="Search queue"><SymbolIcon Symbol="Find" /></Button>
                     </Grid>
@@ -164,14 +174,14 @@
                     </StackPanel>
 
                     <Button x:Name="AboutNavButton" Grid.Row="3" Tag="about" Click="SidebarNavigation_Click" Style="{StaticResource SidebarButtonStyle}" Margin="6,4,6,8">
-                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border Width="26" Height="26" CornerRadius="13" Background="#4A4A4A"><TextBlock Text="N" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></Border><StackPanel Grid.Column="1" Margin="9,0,0,0"><TextBlock Text="NativeShift" FontSize="13" /><TextBlock Text="Local only · v0.1.0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel></Grid>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border Width="26" Height="26" CornerRadius="13" Background="#4A4A4A"><TextBlock Text="N" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></Border><StackPanel Grid.Column="1" Margin="9,0,0,0"><TextBlock Text="NativeShift" FontSize="13" /><TextBlock Text="Local only · v0.2.0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel></Grid>
                     </Button>
                 </Grid>
             </Border>
 
             <Grid Grid.Column="1" Background="{StaticResource AppBackgroundBrush}">
                 <Grid Margin="18">
-                    <SplitView x:Name="ConvertPage" DisplayMode="Overlay" PanePlacement="Right" OpenPaneLength="390" CompactPaneLength="0" IsPaneOpen="False" AllowDrop="True" DragOver="DropArea_DragOver" Drop="DropArea_Drop">
+                    <SplitView x:Name="ConvertPage" DisplayMode="Overlay" PanePlacement="Right" OpenPaneLength="390" CompactPaneLength="0" IsPaneOpen="False">
                         <SplitView.Transitions><TransitionCollection><EntranceThemeTransition FromHorizontalOffset="10" /></TransitionCollection></SplitView.Transitions>
                         <SplitView.Pane>
                             <Border Background="#171717" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0" Padding="18">
@@ -215,7 +225,17 @@
                                                 </Grid>
                                                 <Button x:Name="OptionsButton" Grid.Column="2" Height="34" VerticalAlignment="Center" Content="Options" Click="ToggleOptions_Click" IsEnabled="False" />
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="5,0"><TextBlock Text="Output" FontSize="11" Foreground="#808080" /><TextBlock x:Name="OutputLocationText" Text="Same folder as source" FontSize="12" Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" /></StackPanel>
-                                                <Button x:Name="ConvertButton" Grid.Column="4" Width="38" Height="38" MinWidth="38" VerticalAlignment="Center" CornerRadius="19" Padding="0" Click="Convert_Click" Style="{StaticResource PrimaryButtonStyle}" AutomationProperties.Name="Convert" ToolTipService.ToolTip="Add a file first" IsEnabled="False"><FontIcon Glyph="&#xE72A;" FontSize="14" /></Button>
+                                                <Button x:Name="ConvertButton" Grid.Column="4" Width="38" Height="38" MinWidth="38" VerticalAlignment="Center" CornerRadius="19" Padding="0" Click="Convert_Click" Style="{StaticResource PrimaryButtonStyle}" AutomationProperties.Name="Convert" ToolTipService.ToolTip="Add a file first" IsEnabled="False">
+                                                    <Button.Resources>
+                                                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F4F4F4" />
+                                                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#F4F4F4" />
+                                                        <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#111111" />
+                                                        <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#111111" />
+                                                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                                                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                                                    </Button.Resources>
+                                                    <FontIcon Glyph="&#xE72A;" FontSize="14" Foreground="#111111" />
+                                                </Button>
                                             </Grid>
                                         </StackPanel>
                                     </Border>
@@ -226,6 +246,7 @@
                     </SplitView>
 
                     <Grid x:Name="QueuePage" Visibility="Collapsed">
+                        <Grid.Transitions><TransitionCollection><EntranceThemeTransition FromHorizontalOffset="18" /></TransitionCollection></Grid.Transitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Spacing="3"><TextBlock Text="Conversion queue" FontSize="27" FontWeight="SemiBold" /><TextBlock Text="Jobs remain visible after completion." Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel><StackPanel x:Name="QueueActivityPanel" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed"><ProgressRing x:Name="QueueActivity" Width="20" Height="20" IsActive="False" /><TextBlock Text="Converting" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" /></StackPanel></Grid>
                         <Grid Grid.Row="1" Margin="0,14,0,10" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="SearchBox" PlaceholderText="Search files" TextChanged="SearchBox_TextChanged" /><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"><ComboBox x:Name="QueueTypeFilter" MinWidth="125" SelectedIndex="0"><ComboBoxItem Content="All types" Tag="all" /><ComboBoxItem Content="Images" Tag="image" /><ComboBoxItem Content="Audio" Tag="audio" /><ComboBoxItem Content="Video" Tag="video" /></ComboBox><ComboBox x:Name="StateFilter" MinWidth="135" SelectedIndex="0"><ComboBoxItem Content="All statuses" Tag="all" /><ComboBoxItem Content="Ready" Tag="ready" /><ComboBoxItem Content="Pending" Tag="pending" /><ComboBoxItem Content="Converting" Tag="converting" /><ComboBoxItem Content="Completed" Tag="completed" /><ComboBoxItem Content="Warnings" Tag="completed_with_warnings" /><ComboBoxItem Content="Failed" Tag="failed" /><ComboBoxItem Content="Cancelled" Tag="cancelled" /></ComboBox></StackPanel></Grid>
@@ -234,9 +255,68 @@
                         <Grid Grid.Row="4" Margin="0,8,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><ProgressBar x:Name="OverallProgress" Minimum="0" Maximum="100" Height="3" /><CommandBar Grid.Row="1" Margin="0,5,0,0" Background="Transparent" DefaultLabelPosition="Right"><AppBarButton x:Name="PauseQueueButton" Icon="Pause" Label="Pause" Click="Pause_Click" /><AppBarButton x:Name="ResumeQueueButton" Icon="Play" Label="Resume" Click="Resume_Click" IsEnabled="False" /><AppBarSeparator /><AppBarButton x:Name="CancelSelectedButton" Icon="Cancel" Label="Cancel selected" Click="CancelSelected_Click" IsEnabled="False" /><AppBarButton x:Name="RetrySelectedButton" Icon="Refresh" Label="Retry" Click="RetrySelected_Click" IsEnabled="False" /><AppBarButton x:Name="RemoveSelectedButton" Icon="Delete" Label="Remove" Click="RemoveSelected_Click" IsEnabled="False" /><AppBarButton x:Name="OpenOutputButton" Icon="OpenLocal" Label="Open output" Click="OpenOutput_Click" IsEnabled="False" /><CommandBar.SecondaryCommands><AppBarButton x:Name="CancelAllButton" Label="Cancel all jobs" Click="CancelAll_Click" /><AppBarButton x:Name="ClearCompletedButton" Label="Clear completed jobs" Click="ClearCompleted_Click" /></CommandBar.SecondaryCommands></CommandBar></Grid>
                     </Grid>
 
-                    <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"><StackPanel MaxWidth="820" HorizontalAlignment="Left" Spacing="15"><StackPanel Spacing="3"><TextBlock Text="Settings" FontSize="27" FontWeight="SemiBold" /><TextBlock Text="Global defaults apply to every new conversion." Foreground="{StaticResource SecondaryTextBrush}" /></StackPanel><Border Style="{StaticResource SettingsCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Files and performance" FontSize="18" FontWeight="SemiBold" /><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="DefaultOutputFolderSetting" Header="Default output folder (blank uses each source folder)" IsReadOnly="True" /><Button Grid.Column="1" Content="Browse" VerticalAlignment="Bottom" Click="BrowseOutput_Click" /></Grid><NumberBox x:Name="MaximumJobsSetting" Header="Maximum concurrent conversions (after restart)" Minimum="1" Maximum="32" Value="2" /><ComboBox x:Name="HardwareSetting" Header="Hardware acceleration" SelectedIndex="0"><ComboBoxItem Content="Automatic" Tag="auto" /><ComboBoxItem Content="Prefer hardware" Tag="prefer_hardware" /><ComboBoxItem Content="Software only" Tag="disabled" /></ComboBox></StackPanel></Border><Border Style="{StaticResource SettingsCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Output behavior" FontSize="18" FontWeight="SemiBold" /><ToggleSwitch x:Name="PreserveMetadataSetting" Header="Preserve metadata where supported" /><ComboBox x:Name="ExistingFilePolicySetting" Header="When an output already exists" SelectedIndex="3"><ComboBoxItem Content="Ask" Tag="ask" /><ComboBoxItem Content="Skip" Tag="skip" /><ComboBoxItem Content="Replace" Tag="replace" /><ComboBoxItem Content="Generate a unique name" Tag="unique" /></ComboBox></StackPanel></Border><Border Style="{StaticResource SettingsCardStyle}"><StackPanel Spacing="10"><TextBlock Text="App and privacy" FontSize="18" FontWeight="SemiBold" /><ComboBox x:Name="ThemeSetting" Header="Appearance" SelectedIndex="0"><ComboBoxItem Content="Dark" Tag="dark" /></ComboBox><ComboBox x:Name="LoggingSetting" Header="Logging level" SelectedIndex="1"><ComboBoxItem Content="Debug (may include full paths)" Tag="debug" /><ComboBoxItem Content="Information" Tag="information" /><ComboBoxItem Content="Warning" Tag="warning" /><ComboBoxItem Content="Error" Tag="error" /></ComboBox><ToggleSwitch x:Name="NotificationsSetting" Header="Completion notifications" IsOn="True" /><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Save settings" Click="SaveSettings_Click" Style="{StaticResource PrimaryButtonStyle}" /><Button Content="Reset defaults" Click="ResetSettings_Click" /><Button Content="Open logs" Click="OpenLogs_Click" /><Button Content="Copy diagnostics" Click="CopyDiagnostics_Click" /></StackPanel><TextBlock x:Name="SettingsStatus" TextWrapping="Wrap" /></StackPanel></Border></StackPanel></ScrollViewer>
+                    <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                        <StackPanel MaxWidth="940" HorizontalAlignment="Center" Spacing="15">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Settings" FontSize="27" FontWeight="SemiBold" />
+                                <TextBlock Text="Global defaults apply to every new conversion." Foreground="{StaticResource SecondaryTextBrush}" />
+                            </StackPanel>
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Files and performance" FontSize="18" FontWeight="SemiBold" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="DefaultOutputFolderSetting" Header="Default output folder (blank uses each source folder)" IsReadOnly="True" />
+                                        <Button Grid.Column="1" Content="Browse" VerticalAlignment="Bottom" Click="BrowseOutput_Click" />
+                                    </Grid>
+                                    <NumberBox x:Name="MaximumJobsSetting" Header="Maximum concurrent conversions (after restart)" Minimum="1" Maximum="32" Value="2" />
+                                    <ComboBox x:Name="HardwareSetting" Header="Hardware acceleration" SelectedIndex="0">
+                                        <ComboBoxItem Content="Automatic" Tag="auto" />
+                                        <ComboBoxItem Content="Prefer hardware" Tag="prefer_hardware" />
+                                        <ComboBoxItem Content="Software only" Tag="disabled" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Output behavior" FontSize="18" FontWeight="SemiBold" />
+                                    <ToggleSwitch x:Name="PreserveMetadataSetting" Header="Preserve metadata where supported" />
+                                    <ComboBox x:Name="ExistingFilePolicySetting" Header="When an output already exists" SelectedIndex="3">
+                                        <ComboBoxItem Content="Ask" Tag="ask" />
+                                        <ComboBoxItem Content="Skip" Tag="skip" />
+                                        <ComboBoxItem Content="Replace" Tag="replace" />
+                                        <ComboBoxItem Content="Generate a unique name" Tag="unique" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="App and privacy" FontSize="18" FontWeight="SemiBold" />
+                                    <ComboBox x:Name="ThemeSetting" Header="Appearance" SelectedIndex="0">
+                                        <ComboBoxItem Content="Dark" Tag="dark" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="LoggingSetting" Header="Logging level" SelectedIndex="1">
+                                        <ComboBoxItem Content="Debug (may include full paths)" Tag="debug" />
+                                        <ComboBoxItem Content="Information" Tag="information" />
+                                        <ComboBoxItem Content="Warning" Tag="warning" />
+                                        <ComboBoxItem Content="Error" Tag="error" />
+                                    </ComboBox>
+                                    <ToggleSwitch x:Name="NotificationsSetting" Header="Completion notifications" IsOn="True" />
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Spacing="8" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                    <Button Content="Save settings" Click="SaveSettings_Click" Style="{StaticResource PrimaryButtonStyle}" />
+                                    <Button Content="Reset defaults" Click="ResetSettings_Click" />
+                                    <Button Content="Open logs" Click="OpenLogs_Click" />
+                                    <Button Content="Copy diagnostics" Click="CopyDiagnostics_Click" />
+                                </StackPanel>
+                                <TextBlock x:Name="SettingsStatus" TextWrapping="Wrap" TextAlignment="Right" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
                     <ScrollViewer x:Name="CapabilitiesPage" Visibility="Collapsed"><StackPanel MaxWidth="820" HorizontalAlignment="Left" Spacing="15"><TextBlock Text="Capabilities" FontSize="27" FontWeight="SemiBold" /><TextBlock Text="Inspect codecs and hardware devices available on this computer." Foreground="{StaticResource SecondaryTextBrush}" /><Button Content="Refresh capabilities" Click="RefreshCapabilities_Click" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" /><Border Style="{StaticResource SettingsCardStyle}"><TextBlock x:Name="CapabilitiesText" Text="Select refresh to inspect this computer." TextWrapping="Wrap" IsTextSelectionEnabled="True" /></Border></StackPanel></ScrollViewer>
-                    <ScrollViewer x:Name="AboutPage" Visibility="Collapsed"><StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="15"><TextBlock Text="About NativeShift" FontSize="27" FontWeight="SemiBold" /><Border Style="{StaticResource SettingsCardStyle}"><StackPanel Spacing="9"><TextBlock Text="NativeShift 0.1.0" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Private, local image, audio, and video conversion. No uploads, account, analytics, advertising, or telemetry." TextWrapping="Wrap" /><TextBlock Text="The portable build is self-contained. The development MSIX remains unsigned until a trusted publisher certificate is configured." Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" /></StackPanel></Border></StackPanel></ScrollViewer>
+                    <ScrollViewer x:Name="AboutPage" Visibility="Collapsed"><StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="15"><TextBlock Text="About NativeShift" FontSize="27" FontWeight="SemiBold" /><Border Style="{StaticResource SettingsCardStyle}"><StackPanel Spacing="9"><TextBlock Text="NativeShift 0.2.0" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Private, local image, audio, and video conversion. No uploads, account, analytics, advertising, or telemetry." TextWrapping="Wrap" /><TextBlock Text="The portable build is self-contained. The development MSIX remains unsigned until a trusted publisher certificate is configured." Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" /></StackPanel></Border></StackPanel></ScrollViewer>
                 </Grid>
             </Grid>
         </Grid>

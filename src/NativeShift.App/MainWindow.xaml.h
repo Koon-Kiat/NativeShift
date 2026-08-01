@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 namespace winrt::NativeShift::implementation {
@@ -33,6 +34,9 @@ struct MainWindow : MainWindowT<MainWindow> {
     void SidebarJob_ItemClick(
         IInspectable const&,
         Microsoft::UI::Xaml::Controls::ItemClickEventArgs const& event);
+    void
+    SidebarJobAction_Click(IInspectable const&,
+                           Microsoft::UI::Xaml::RoutedEventArgs const& event);
     winrt::fire_and_forget
     AddFiles_Click(IInspectable const&,
                    Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -119,6 +123,9 @@ struct MainWindow : MainWindowT<MainWindow> {
     void UpdateSidebarSelection(std::wstring_view tag);
     void SetSidebarOpen(bool open);
     void ResetCurrentSession(std::wstring_view status);
+    [[nodiscard]] Microsoft::UI::Xaml::Controls::Grid
+    BuildSidebarJobItem(::NativeShift::presentation::QueueRow const& row,
+                        bool pinned);
     winrt::fire_and_forget LoadImagePreview(std::filesystem::path path,
                                             std::uint64_t request);
 
@@ -130,6 +137,8 @@ struct MainWindow : MainWindowT<MainWindow> {
     std::vector<std::wstring> added_file_texts_;
     std::vector<std::size_t> sidebar_job_indices_;
     std::vector<std::wstring> sidebar_job_texts_;
+    std::unordered_set<std::uint64_t> pinned_jobs_;
+    std::unordered_set<std::uint64_t> archived_jobs_;
     std::vector<std::wstring> navigation_history_;
     std::size_t navigation_position_{};
     bool refreshing_view_{false};
