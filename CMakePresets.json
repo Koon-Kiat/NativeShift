@@ -13,8 +13,7 @@
       "binaryDir": "${sourceDir}/out/build/nativeshift-${presetName}",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "environment": {
-        "VCPKG_DOWNLOADS": "${sourceDir}/out/vcpkg-downloads",
-        "VCPKG_MAX_CONCURRENCY": "1"
+        "VCPKG_DOWNLOADS": "${sourceDir}/out/vcpkg-downloads"
       },
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",

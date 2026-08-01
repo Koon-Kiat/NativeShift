@@ -27,4 +27,7 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: always
-          deny-licenses: GPL-2.0-only, GPL-3.0-only, AGPL-1.0-only, AGPL-3.0-only, SSPL-1.0
+          allow-licenses: >-
+            0BSD, Apache-2.0, BSD-2-Clause, BSD-3-Clause, BSL-1.0, IJG, ISC,
+            LGPL-2.1-only, LGPL-2.1-or-later, MIT, MPL-2.0, Unicode-3.0,
+            Zlib, libpng-2.0

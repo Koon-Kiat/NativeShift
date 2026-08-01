@@ -1,6 +1,8 @@
 * @Koon-Kiat
 
 /.github/ @Koon-Kiat
+/.clusterfuzzlite/ @Koon-Kiat
+/fuzz/ @Koon-Kiat
 /packaging/ @Koon-Kiat
 /scripts/build-packages.ps1 @Koon-Kiat
 /scripts/verify-packages.ps1 @Koon-Kiat

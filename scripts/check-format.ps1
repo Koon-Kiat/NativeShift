@@ -36,6 +36,7 @@ $program = if ($clangFormat -is [string]) {
 $relativeFiles = & git -C $repositoryRoot ls-files --cached --others --exclude-standard -- `
     'src/**/*.cpp' 'src/**/*.h' 'src/**/*.hpp' `
     'tests/**/*.cpp' 'tests/**/*.h' 'tests/**/*.hpp' `
+    'fuzz/**/*.cpp' 'fuzz/**/*.h' 'fuzz/**/*.hpp' `
     'benchmarks/**/*.cpp' 'benchmarks/**/*.h' 'benchmarks/**/*.hpp'
 if ($LASTEXITCODE -ne 0) {
     throw 'git ls-files failed while collecting project-owned C++.'
