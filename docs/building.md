@@ -8,7 +8,7 @@ Install Visual Studio with:
 - MSVC x64 build tools
 - A current Windows SDK
 - CMake tools for Windows
-- Windows application development and MSIX packaging tools
+- Windows application development tools (MSIX packaging tools are optional)
 
 Install or use a Visual Studio-bundled vcpkg. CMake 3.28+ and Ninja must be
 available in the x64 Developer PowerShell.
@@ -49,6 +49,10 @@ msbuild .\src\NativeShift.App\NativeShift.App.vcxproj /restore `
 
 NuGet versions are pinned in the project. The MSIX development publisher is
 not a trusted production identity.
+
+For an unpackaged self-contained EXE, use the portable build switches from
+`scripts/build-packages.ps1`, or run that script directly and extract the
+resulting `NativeShift-<version>-portable-windows-x64.zip`.
 
 ## AddressSanitizer
 

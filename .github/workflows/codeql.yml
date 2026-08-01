@@ -1,8 +1,6 @@
 name: CodeQL
 
 on:
-  pull_request:
-    branches: [main]
   push:
     branches: [main]
   schedule:
@@ -50,6 +48,7 @@ jobs:
         uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         with:
           languages: c-cpp
+          build-mode: manual
           queries: security-extended
       - name: Compile observed C++
         shell: pwsh

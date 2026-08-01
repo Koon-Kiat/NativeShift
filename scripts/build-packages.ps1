@@ -2,7 +2,7 @@
 param(
     [Parameter()]
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.2.0',
 
     [Parameter()]
     [ValidateSet('x64')]
@@ -12,7 +12,10 @@ param(
     [switch]$SkipBuild,
 
     [Parameter()]
-    [switch]$SkipAppBuild
+    [switch]$SkipAppBuild,
+
+    [Parameter()]
+    [switch]$IncludeMsix
 )
 
 $ErrorActionPreference = 'Stop'
@@ -162,19 +165,21 @@ if ($runtimeDlls.Count -eq 0) {
 }
 
 if (-not $SkipAppBuild) {
-    Invoke-Checked -Program $msbuild -Arguments @(
-        $appProject,
-        '/restore',
-        '/m:1',
-        '/v:minimal',
-        '/p:Configuration=Release',
-        "/p:Platform=$Architecture",
-        '/p:AppxBundle=Never',
-        '/p:GenerateAppxPackageOnBuild=true',
-        '/p:UapAppxPackageBuildMode=SideloadOnly',
-        '/p:AppxPackageSigningEnabled=false',
-        "/p:AppxPackageDir=$msixOutput"
-    )
+    if ($IncludeMsix) {
+        Invoke-Checked -Program $msbuild -Arguments @(
+            $appProject,
+            '/restore',
+            '/m:1',
+            '/v:minimal',
+            '/p:Configuration=Release',
+            "/p:Platform=$Architecture",
+            '/p:AppxBundle=Never',
+            '/p:GenerateAppxPackageOnBuild=true',
+            '/p:UapAppxPackageBuildMode=SideloadOnly',
+            '/p:AppxPackageSigningEnabled=false',
+            "/p:AppxPackageDir=$msixOutput"
+        )
+    }
 
     Invoke-Checked -Program $msbuild -Arguments @(
         $appProject,
@@ -192,20 +197,23 @@ if (-not $SkipAppBuild) {
     )
 }
 
-$msixCandidate = Get-ChildItem -LiteralPath $msixOutput -Recurse -File |
-    Where-Object {
-        $_.Extension -in @('.msix', '.appx') -and
-        $_.Name -match '^NativeShift\.App_' -and
-        $_.FullName -notmatch '[\\/]Dependencies[\\/]'
-    } |
-    Sort-Object FullName |
-    Select-Object -First 1
-if (-not $msixCandidate) {
-    throw 'MSBuild did not produce an MSIX package.'
+$msixPath = $null
+if ($IncludeMsix) {
+    $msixCandidate = Get-ChildItem -LiteralPath $msixOutput -Recurse -File |
+        Where-Object {
+            $_.Extension -in @('.msix', '.appx') -and
+            $_.Name -match '^NativeShift\.App_' -and
+            $_.FullName -notmatch '[\\/]Dependencies[\\/]'
+        } |
+        Sort-Object FullName |
+        Select-Object -First 1
+    if (-not $msixCandidate) {
+        throw 'MSBuild did not produce an MSIX package.'
+    }
+    $msixName = "NativeShift-$Version-windows-$Architecture.msix"
+    $msixPath = Join-Path $distributionRoot $msixName
+    Copy-Item -LiteralPath $msixCandidate.FullName -Destination $msixPath
 }
-$msixName = "NativeShift-$Version-windows-$Architecture.msix"
-$msixPath = Join-Path $distributionRoot $msixName
-Copy-Item -LiteralPath $msixCandidate.FullName -Destination $msixPath
 
 $licenseStage = Join-Path $stagingRoot 'notices'
 New-Item -ItemType Directory -Path (Join-Path $licenseStage 'LICENSES') -Force | Out-Null
@@ -225,22 +233,24 @@ if ((Get-ChildItem -LiteralPath (Join-Path $licenseStage 'LICENSES') -File).Coun
     throw 'No resolved vcpkg license texts were found.'
 }
 
-$makeAppx = Find-MakeAppx
-$expandedMsix = Join-Path $stagingRoot 'msix-expanded'
-if (Test-Path -LiteralPath $expandedMsix) {
-    Remove-Item -LiteralPath $expandedMsix -Recurse -Force
+if ($IncludeMsix) {
+    $makeAppx = Find-MakeAppx
+    $expandedMsix = Join-Path $stagingRoot 'msix-expanded'
+    if (Test-Path -LiteralPath $expandedMsix) {
+        Remove-Item -LiteralPath $expandedMsix -Recurse -Force
+    }
+    Invoke-Checked -Program $makeAppx -Arguments @(
+        'unpack', '/p', $msixPath, '/d', $expandedMsix, '/o'
+    )
+    Copy-Item -Path (Join-Path $licenseStage '*') `
+        -Destination $expandedMsix -Recurse -Force
+    Copy-Item -LiteralPath $bridgeDll -Destination $expandedMsix -Force
+    $runtimeDlls | Copy-Item -Destination $expandedMsix -Force
+    Remove-Item -LiteralPath $msixPath -Force
+    Invoke-Checked -Program $makeAppx -Arguments @(
+        'pack', '/d', $expandedMsix, '/p', $msixPath, '/o'
+    )
 }
-Invoke-Checked -Program $makeAppx -Arguments @(
-    'unpack', '/p', $msixPath, '/d', $expandedMsix, '/o'
-)
-Copy-Item -Path (Join-Path $licenseStage '*') `
-    -Destination $expandedMsix -Recurse -Force
-Copy-Item -LiteralPath $bridgeDll -Destination $expandedMsix -Force
-$runtimeDlls | Copy-Item -Destination $expandedMsix -Force
-Remove-Item -LiteralPath $msixPath -Force
-Invoke-Checked -Program $makeAppx -Arguments @(
-    'pack', '/d', $expandedMsix, '/p', $msixPath, '/o'
-)
 
 $cliStage = Join-Path $stagingRoot 'cli'
 New-Item -ItemType Directory -Path $cliStage | Out-Null

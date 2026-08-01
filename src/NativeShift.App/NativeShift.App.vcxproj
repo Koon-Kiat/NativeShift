@@ -74,7 +74,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(NativeBuildRoot)\src\NativeShift.GuiBridge;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>NativeShift.GuiBridge.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>NativeShift.GuiBridge.lib;shell32.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">

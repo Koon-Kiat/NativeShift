@@ -2,11 +2,14 @@
 param(
     [Parameter()]
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.2.0',
 
     [Parameter()]
     [ValidateSet('x64')]
-    [string]$Architecture = 'x64'
+    [string]$Architecture = 'x64',
+
+    [Parameter()]
+    [switch]$IncludeMsix
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +20,6 @@ $packageRoot = Join-Path $repositoryRoot 'out\packages'
 $verificationRoot = Join-Path $repositoryRoot 'out\package-verification'
 
 $expected = @(
-    "NativeShift-$Version-windows-$Architecture.msix",
     "NativeShift-$Version-portable-windows-$Architecture.zip",
     "NativeShift-CLI-$Version-windows-$Architecture.zip",
     "NativeShift-Symbols-$Version-windows-$Architecture.zip",
@@ -25,6 +27,9 @@ $expected = @(
     "NativeShift-$Version-release-manifest.json",
     'SHA256SUMS'
 )
+if ($IncludeMsix) {
+    $expected += "NativeShift-$Version-windows-$Architecture.msix"
+}
 foreach ($name in $expected) {
     if (-not (Test-Path -LiteralPath (Join-Path $packageRoot $name))) {
         throw "Expected package is missing: $name"
@@ -60,41 +65,44 @@ foreach ($archive in $archives) {
     }
 }
 
-$makeAppx = Get-Command makeappx.exe -ErrorAction SilentlyContinue
-if (-not $makeAppx) {
-    $makeAppx = Get-ChildItem `
-        (Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin') `
-        -Filter makeappx.exe -File -Recurse -ErrorAction SilentlyContinue |
-        Where-Object FullName -Match '\\x64\\makeappx\.exe$' |
-        Sort-Object FullName -Descending |
-        Select-Object -First 1
-}
-if (-not $makeAppx) {
-    throw 'makeappx.exe was not found.'
-}
-$makeAppxPath = if (
-    $makeAppx -is [Management.Automation.CommandInfo]
-) {
-    $makeAppx.Source
-} else {
-    $makeAppx.FullName
-}
-$msixRoot = Join-Path $verificationRoot 'NativeShift-MSIX'
-& $makeAppxPath unpack `
-    /p (Join-Path $packageRoot "NativeShift-$Version-windows-$Architecture.msix") `
-    /d $msixRoot /o | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw 'The MSIX could not be unpacked.'
-}
+$msixRoot = $null
+if ($IncludeMsix) {
+    $makeAppx = Get-Command makeappx.exe -ErrorAction SilentlyContinue
+    if (-not $makeAppx) {
+        $makeAppx = Get-ChildItem `
+            (Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin') `
+            -Filter makeappx.exe -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object FullName -Match '\\x64\\makeappx\.exe$' |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+    }
+    if (-not $makeAppx) {
+        throw 'makeappx.exe was not found.'
+    }
+    $makeAppxPath = if (
+        $makeAppx -is [Management.Automation.CommandInfo]
+    ) {
+        $makeAppx.Source
+    } else {
+        $makeAppx.FullName
+    }
+    $msixRoot = Join-Path $verificationRoot 'NativeShift-MSIX'
+    & $makeAppxPath unpack `
+        /p (Join-Path $packageRoot "NativeShift-$Version-windows-$Architecture.msix") `
+        /d $msixRoot /o | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'The MSIX could not be unpacked.'
+    }
 
-[xml]$appxManifest = Get-Content -LiteralPath (Join-Path $msixRoot 'AppxManifest.xml') -Raw
-$identity = $appxManifest.Package.Identity
-$semanticVersion = ($Version -split '-', 2)[0]
-if ($identity.ProcessorArchitecture -ne $Architecture) {
-    throw "MSIX architecture is $($identity.ProcessorArchitecture), expected $Architecture."
-}
-if ($identity.Version -notlike "$semanticVersion.*") {
-    throw "MSIX version is $($identity.Version), expected $semanticVersion.x."
+    [xml]$appxManifest = Get-Content -LiteralPath (Join-Path $msixRoot 'AppxManifest.xml') -Raw
+    $identity = $appxManifest.Package.Identity
+    $semanticVersion = ($Version -split '-', 2)[0]
+    if ($identity.ProcessorArchitecture -ne $Architecture) {
+        throw "MSIX architecture is $($identity.ProcessorArchitecture), expected $Architecture."
+    }
+    if ($identity.Version -notlike "$semanticVersion.*") {
+        throw "MSIX version is $($identity.Version), expected $semanticVersion.x."
+    }
 }
 
 $payloadRoots = Get-ChildItem -LiteralPath $verificationRoot -Directory |
@@ -118,16 +126,21 @@ foreach ($root in $payloadRoots) {
 
 $portable = Join-Path $verificationRoot "NativeShift-$Version-portable-windows-$Architecture"
 $cli = Join-Path $verificationRoot "NativeShift-CLI-$Version-windows-$Architecture"
-foreach ($required in @(
+$requiredPayload = @(
     (Join-Path $portable 'NativeShift.exe'),
     (Join-Path $portable 'NativeShift.GuiBridge.dll'),
     (Join-Path $portable 'App.xbf'),
     (Join-Path $portable 'MainWindow.xbf'),
-    (Join-Path $cli 'nativeshift-cli.exe'),
-    (Join-Path $msixRoot 'NativeShift.exe'),
-    (Join-Path $msixRoot 'NativeShift.GuiBridge.dll'),
-    (Join-Path $msixRoot 'AppxManifest.xml')
-)) {
+    (Join-Path $cli 'nativeshift-cli.exe')
+)
+if ($IncludeMsix) {
+    $requiredPayload += @(
+        (Join-Path $msixRoot 'NativeShift.exe'),
+        (Join-Path $msixRoot 'NativeShift.GuiBridge.dll'),
+        (Join-Path $msixRoot 'AppxManifest.xml')
+    )
+}
+foreach ($required in $requiredPayload) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Required executable or bridge is missing: $required"
     }

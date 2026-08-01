@@ -6,8 +6,9 @@ accounts, advertisements, telemetry, or shell-built codec commands.
 
 > Project status: release candidate. Image conversion is complete; native
 > FFmpeg audio conversion and video remux/software encoding are implemented.
-> Production MSIX signing and hardware-specific validation require the release
-> environment described below.
+> The portable self-contained EXE/ZIP is the primary distribution. Production
+> MSIX signing and hardware-specific validation require a separate release
+> environment.
 
 ## Supported conversion
 
@@ -78,14 +79,14 @@ JSON mode reserves standard output for stable JSON. See the
 ## Packages
 
 ```powershell
-.\scripts\build-packages.ps1 -Version 0.1.0
-.\scripts\verify-packages.ps1 -Version 0.1.0
+.\scripts\build-packages.ps1 -Version 0.2.0
+.\scripts\verify-packages.ps1 -Version 0.2.0
 ```
 
-The pipeline creates an x64 MSIX, portable GUI ZIP, CLI ZIP, symbols ZIP, SPDX
-JSON SBOM, release manifest, license bundle, and SHA-256 checksums. The checked
-in publisher is a placeholder; a protected subject-matched certificate is
-required for a trusted release. See [distribution](docs/distribution.md).
+The default pipeline creates a portable GUI ZIP, CLI ZIP, symbols ZIP, SPDX JSON
+SBOM, release manifest, license bundle, and SHA-256 checksums. Pass
+`-IncludeMsix` only when explicitly testing the unsigned development package;
+Windows will not trust it as an installer. See [distribution](docs/distribution.md).
 
 ## Privacy and security
 
