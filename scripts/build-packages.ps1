@@ -139,7 +139,7 @@ function Find-MakeAppx {
 
 if (-not $SkipBuild) {
     Invoke-Checked -Program 'cmake.exe' -Arguments @('--preset', 'release')
-    Invoke-Checked -Program 'cmake.exe' -Arguments @('--build', '--preset', 'release')
+    Invoke-Checked -Program 'cmake.exe' -Arguments @('--build', '--preset', 'release', '--parallel', '4')
 }
 
 $cliExecutable = Join-Path $releaseBuild 'src\NativeShift.Cli\nativeshift-cli.exe'

@@ -45,7 +45,7 @@ jobs:
           . ./scripts/initialize-build-environment.ps1
           Initialize-NativeBuildEnvironment
           cmake --preset debug
-          cmake --build --preset debug
+          cmake --build --preset debug --parallel 4
       - name: Enforce line coverage gate
         shell: pwsh
         run: ./scripts/run-coverage.ps1 -MinimumLinePercent 65

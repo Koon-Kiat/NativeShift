@@ -56,7 +56,7 @@ jobs:
         run: |
           . ./scripts/initialize-build-environment.ps1
           Initialize-NativeBuildEnvironment
-          cmake --build --preset release
+          cmake --build --preset release --parallel 4
       - name: Analyze
         uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         with:

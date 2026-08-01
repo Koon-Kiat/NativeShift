@@ -91,7 +91,7 @@ jobs:
         run: |
           . ./scripts/initialize-build-environment.ps1
           Initialize-NativeBuildEnvironment
-          cmake --build --preset asan
+          cmake --build --preset asan --parallel 4
       - name: Run representative tests
         shell: pwsh
         run: |

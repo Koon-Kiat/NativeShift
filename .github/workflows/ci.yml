@@ -81,7 +81,7 @@ jobs:
         run: |
           . ./scripts/initialize-build-environment.ps1
           Initialize-NativeBuildEnvironment
-          cmake --build --preset $env:CONFIGURATION.ToLowerInvariant()
+          cmake --build --preset $env:CONFIGURATION.ToLowerInvariant() --parallel 4
         env:
           CONFIGURATION: ${{ matrix.configuration }}
       - name: Run unit and integration tests
