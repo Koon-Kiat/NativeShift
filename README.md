@@ -9,12 +9,6 @@ accounts, advertisements, telemetry, or shell-built codec commands.
 > Production MSIX signing and hardware-specific validation require the release
 > environment described below.
 
-<p align="center">
-  <img src="src/NativeShift.App/Assets/NativeShiftLogoMaster.png"
-       alt="NativeShift logo"
-       width="160">
-</p>
-
 ## Supported conversion
 
 | Kind | Inputs | Outputs |
