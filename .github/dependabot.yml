@@ -10,7 +10,8 @@ updates:
     open-pull-requests-limit: 5
     labels: [dependencies, github-actions]
     commit-message:
-      prefix: Update
+      prefix: ci
+      include: scope
     groups:
       actions-minor-patch:
         update-types: [minor, patch]
@@ -25,7 +26,8 @@ updates:
     open-pull-requests-limit: 5
     labels: [dependencies, nuget]
     commit-message:
-      prefix: Update
+      prefix: build
+      include: scope
     groups:
       nuget-minor-patch:
         update-types: [minor, patch]
